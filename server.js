@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '.')));
 
-// رابط الاتصال بقاعدة البيانات السحابية (استبدل username و password بالبيانات الحقيقية بتاعتك)
+// رابط الاتصال بقاعدة البيانات السحابية الصحيح والمضبوط بالبيانات الخاصة بك
 const uri = "mongodb+srv://bodacpm:112003Ab@cluster3.oqbrc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster3";
 const client = new MongoClient(uri);
 
@@ -16,7 +16,7 @@ let db, playersCollection;
 async function connectDB() {
     try {
         await client.connect();
-        db = client.db("talabat_game"); // اسم قاعدة البيانات
+        db = client.db("talabat_game"); // اسم قاعدة البيانات المعتمد
         playersCollection = db.collection("players");
         console.log("Connected successfully to MongoDB Atlas!");
     } catch (e) {
