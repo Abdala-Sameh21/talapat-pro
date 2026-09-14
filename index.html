@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Talabat Tycoon Pro - Live GPS</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (Cairo) -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        * { font-family: 'Cairo', sans-serif; user-select: none; -webkit-tap-highlight-color: transparent; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #030712; color: #f3f4f6; }
+        .app-container { display: flex; flex-direction: column; width: 100vw; height: 100vh; height: 100dvh; position: relative; overflow: hidden; }
+        
+        #map { width: 100%; height: 26vh; flex-shrink: 0; z-index: 1; background-color: #0b0f19; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .glass-panel { background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .map-icon { background: rgba(15, 23, 42, 0.9); border: 2px solid #f97316; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
+        
+        #sidebarMenu {
+            position: fixed; top: 0; right: 0; bottom: 0; width: 280px; background-color: #030712; z-index: 9999;
+            transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: -5px 0 25px rgba(0, 0, 0, 0.8); border-right: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        #sidebarMenu.open { transform: translateX(0); }
+        #sidebarOverlay {
+            position: fixed; inset: 0; background: rgba(3, 7, 18, 0.8); z-index: 9988; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        #sidebarOverlay.open { opacity: 1; pointer-events: auto; }
+        
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 20px rgba(249, 115, 22, 0.4); }
+            50% { box-shadow: 0 0 35px rgba(249, 115, 22, 0.8); }
+        }
+        .pro-badge-glow { animation: pulseGlow 2.5s infinite; }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+
+        <!-- شاشة البداية الاحترافية -->
+        <div id="welcomeSplash" class="fixed inset-0 bg-slate-950 z-[1000] flex flex-col items-center justify-between p-6 text-center overflow-y-auto">
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(249,115,22,0.15)_0,transparent_70%)] pointer-events-none"></div>
+            <div class="my-auto w-full max-w-sm flex flex-col items-center relative z-10">
+                <div class="w-24 h-24 bg-gradient-to-tr from-orange-600 via-amber-500 to-yellow-400 rounded-3xl flex items-center justify-center text-5xl text-white mb-4 pro-badge-glow shadow-2xl">
+                    <i class="fa-solid fa-store"></i>
+                </div>
+                <h1 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-200 mb-1">Talabat Tycoon Pro</h1>
+                <p class="text-xs text-orange-400/80 font-bold mb-6 tracking-wider">إمبراطورية التوصيل الذكية والمستندة للموقع الحقيقي</p>
+
+                <div class="glass-panel p-4 rounded-2xl w-full border border-orange-500/20 mb-5 text-right flex flex-col gap-2">
+                    <div class="flex items-center gap-2 text-[11px] text-gray-300"><i class="fa-solid fa-circle-check text-orange-400"></i> شوارع ومطاعم حقيقية حول موقعك بالـ GPS</div>
+                    <div class="flex items-center gap-2 text-[11px] text-gray-300"><i class="fa-solid fa-circle-check text-orange-400"></i> نظام إدارة أسطول المناديب والشركات</div>
+                    <div class="flex items-center gap-2 text-[11px] text-gray-300"><i class="fa-solid fa-circle-check text-orange-400"></i> لوحة شرف متزامنة حية لحفظ وتسجيل كل اللاعبين</div>
+                </div>
+
+                <button id="startSplashBtn" type="button" class="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 font-black py-4 rounded-2xl shadow-xl shadow-orange-500/30 text-sm transition transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer">
+                    <span>دخول اللعبة فوراً</span> <i class="fa-solid fa-rocket text-xs"></i>
+                </button>
+            </div>
+            <div class="text-[10px] text-gray-500 mt-2 relative z-10">Talabat Tycoon Pro Live &copy; 2026</div>
+        </div>
+
+        <!-- شاشة تسجيل الدخول مع التحقق من الأدمن وباسورد -->
+        <div id="loginScreen" class="fixed inset-0 bg-slate-950/95 z-[999] flex flex-col items-center justify-center p-6 text-center" style="display: none;">
+            <div class="glass-panel p-6 rounded-3xl border border-orange-500/30 w-full max-w-xs shadow-2xl">
+                <div class="w-16 h-16 bg-gradient-to-tr from-orange-600 to-amber-500 rounded-2xl flex items-center justify-center text-3xl text-white mx-auto mb-4 shadow-lg shadow-orange-500/40">
+                    <i class="fa-solid fa-user-tie"></i>
+                </div>
+                <h2 class="text-xl font-black text-white mb-1">تسجيل مدير الشركة</h2>
+                <p class="text-[10px] text-gray-400 mb-4">اكتب اسمك للبدء في حفظ إنجازاتك</p>
+                <input type="text" id="usernameInput" class="w-full bg-slate-900 border border-slate-700 text-white text-center text-sm py-3 px-4 rounded-xl outline-none focus:border-orange-500 mb-4 transition" placeholder="اسم المدير العام" maxlength="15">
+                <button id="loginBtn" type="button" class="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 font-black py-3 rounded-xl shadow-lg text-sm cursor-pointer">بدء اللعبة 🌍</button>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="fixed top-4 left-4 right-4 bg-emerald-500 text-slate-950 font-black text-xs py-2.5 px-4 rounded-xl text-center shadow-lg z-[800] transition" style="display: none;"></div>
+
+        <!-- Header Dashboard -->
+        <div class="glass-panel px-3 py-2.5 flex flex-col gap-1.5 z-20 border-b border-slate-800 flex-shrink-0">
+            <div class="flex items-center justify-between">
+                <!-- أزرار القائمة والإشعارات في اليمين جنب بعض -->
+                <div class="flex items-center gap-1.5">
+                    <div id="openSidebarBtn" class="w-9 h-9 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white text-sm font-bold shadow-md shadow-orange-500/30 cursor-pointer">
+                        <i class="fa-solid fa-bars"></i>
+                    </div>
+                    <button id="headerBroadcastBtn" type="button" class="w-9 h-9 rounded-xl bg-slate-900 border border-slate-700 text-orange-400 font-bold flex items-center justify-center text-xs shadow-md cursor-pointer relative">
+                        <i class="fa-solid fa-bullhorn"></i>
+                        <span id="broadcastDot" class="absolute -top-1 -right-1 w-3 h-3 bg-rose-500 rounded-full border-2 border-slate-900" style="display: none;"></span>
+                    </button>
+                </div>
+
+                <!-- اسم المستخدم والرصيد -->
+                <div class="flex items-center gap-2">
+                    <div class="bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-xl flex items-center gap-1 text-emerald-400 text-xs font-bold">
+                        <i class="fa-solid fa-wallet text-amber-400"></i><span id="balance">500</span>ج
+                    </div>
+                    <div>
+                        <h1 class="text-xs font-black text-white leading-tight flex items-center justify-end gap-1.5">
+                            <span class="text-[9px] bg-emerald-950 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold" id="cityNameDisplay">جاري رصد المنطقة...</span>
+                            <span id="userDisplayName">المدير</span>
+                        </h1>
+                        <span class="text-[9px] text-orange-400 font-semibold block text-left">مستوى: <span id="mgrLevel">1</span> | ضرائب: <span id="taxDueDisplay" class="text-rose-400 font-bold">0ج</span></span>
+                    </div>
+                </div>
+            </div>
+            <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-slate-800">
+                <div id="taxProgressBar" class="bg-rose-500 h-full w-[0%] transition-all duration-300"></div>
+            </div>
+        </div>
+
+        <!-- شريط الإشعارات العام -->
+        <div id="globalBroadcastBanner" class="bg-gradient-to-r from-orange-600 to-amber-600 text-slate-950 font-bold text-[11px] px-3 py-1.5 flex items-center justify-between z-20 shadow-md" style="display: none;">
+            <button id="closeBroadcastBtn" type="button" class="text-slate-950 px-2 cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+            <div class="flex items-center gap-2 truncate">
+                <span id="broadcastText" class="truncate">رسالة الإدارة: مرحباً بالجميع في التحديث الجديد!</span>
+                <i class="fa-solid fa-circle-exclamation animate-bounce"></i>
+            </div>
+        </div>
+
+        <!-- الخريطة -->
+        <div id="map"></div>
+
+        <!-- الطلبات -->
+        <div class="glass-panel border-t border-slate-800 p-3 z-20 flex-1 overflow-y-auto flex flex-col gap-2">
+            <div class="flex justify-between items-center pb-1.5 border-b border-slate-800">
+                <span class="text-[10px] text-gray-400 bg-slate-900 px-2 py-0.5 rounded-full" id="orders-count">0 طلبات</span>
+                <span class="text-[11px] font-bold text-orange-400">طلبات العملاء القريبة منك <i class="fa-solid fa-bell mr-1"></i></span>
+            </div>
+            <div id="orders-container" class="flex flex-col gap-2"></div>
+            <div class="bg-slate-950 rounded-xl p-2 font-mono text-[9px] text-cyan-400 h-14 overflow-y-auto border border-slate-800 flex-shrink-0 text-right" id="logs-box">
+                > جاري مسح المحلات والشوارع المجاورة عبر الخريطة...<br>
+            </div>
+        </div>
+
+        <!-- القائمة الجانبية (يمين الشاشة) -->
+        <div id="sidebarOverlay"></div>
+        <div id="sidebarMenu" class="flex flex-col p-4 overflow-y-auto">
+            <div class="flex justify-between items-center pb-3 mb-3 border-b border-slate-800">
+                <button id="closeSidebarBtn" type="button" class="w-8 h-8 rounded-lg bg-slate-900 text-gray-400 flex items-center justify-center cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+                <div class="flex items-center gap-2">
+                    <h3 class="text-xs font-black text-white">إدارة Talabat Tycoon</h3>
+                    <div class="w-8 h-8 rounded-lg bg-orange-500 flex items-center justify-center text-slate-950 font-black text-xs">
+                        <i class="fa-solid fa-store"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-2 text-right">
+                <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="ops-section-modal"><span>إدارة الطلبات الواردة</span><i class="fa-solid fa-box-archive text-orange-400 w-5 text-center"></i></button>
+                <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="partners-section-modal"><span>مطاعم الشراكة الحية (<span id="restaurantCountBadge">0</span>)</span><i class="fa-solid fa-store text-amber-400 w-5 text-center"></i></button>
+                <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="fleet-section-modal"><span>أسطول التوصيل (المناديب)</span><i class="fa-solid fa-motorcycle text-cyan-400 w-5 text-center"></i></button>
+                <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="finance-section-modal"><span>المالية والضرائب</span><i class="fa-solid fa-file-invoice-dollar text-emerald-400 w-5 text-center"></i></button>
+                <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="upgrades-section-modal"><span>تطويرات الشركة</span><i class="fa-solid fa-arrow-up-right-dots text-purple-400 w-5 text-center"></i></button>
+                <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="missions-section-modal"><span>المهمات والإنجازات</span><i class="fa-solid fa-bullseye text-rose-400 w-5 text-center"></i></button>
+                <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="top-players-section-modal"><span>لوحة الشرف (التوب)</span><i class="fa-solid fa-trophy text-amber-300 w-5 text-center"></i></button>
+            </div>
+        </div>
+
+        <!-- نوافذ العرض -->
+        <div id="contentModal" class="fixed inset-0 bg-slate-950/85 z-[9999] flex items-center justify-center p-4" style="display: none;">
+            <div class="glass-panel rounded-2xl p-4 w-full max-w-sm max-h-[85vh] flex flex-col border border-orange-500/40 shadow-2xl text-right">
+                <div class="flex justify-between items-center pb-2 mb-3 border-b border-slate-800">
+                    <button id="closeContentModalBtn" type="button" class="text-gray-400 w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+                    <h3 id="modalTitle" class="text-orange-400 font-black text-xs">قسم الإدارة</h3>
+                </div>
+                <div id="modalBodyContainer" class="flex-1 overflow-y-auto flex flex-col gap-2.5"></div>
+            </div>
+        </div>
+
+        <div id="riderModal" class="fixed inset-0 bg-slate-950/85 z-[9999] flex items-center justify-center p-4" style="display: none;">
+            <div class="glass-panel rounded-2xl p-4 w-full max-w-xs border border-orange-500/40 shadow-2xl text-right">
+                <h3 class="text-amber-400 font-bold text-center text-xs mb-3">اختر الكابتن للتوصيل 🛵</h3>
+                <div id="modal-riders-list" class="flex flex-col gap-2 mb-3 max-h-48 overflow-y-auto"></div>
+                <button id="closeRiderModalBtn" type="button" class="w-full bg-rose-600 text-white py-1.5 rounded-xl text-[11px] font-bold cursor-pointer">إلغاء</button>
+            </div>
+        </div>
+
+        <div id="hireModal" class="fixed inset-0 bg-slate-950/85 z-[9999] flex items-center justify-center p-4" style="display: none;">
+            <div class="glass-panel rounded-2xl p-4 w-full max-w-sm border border-orange-500/40 shadow-2xl text-right">
+                <div class="flex justify-between items-center mb-3">
+                    <button id="closeHireModalBtn" type="button" class="text-gray-400 cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+                    <h3 class="text-orange-400 font-black text-xs">📋 سوق المناديب المتاحين</h3>
+                </div>
+                <div id="candidates-container" class="flex flex-col gap-2 mb-3 max-h-52 overflow-y-auto"></div>
+                <button id="closeHireModalBtn2" type="button" class="w-full bg-slate-800 text-gray-300 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer">إغلاق</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('contextmenu', event => event.preventDefault());
+
+        // نظام مزامنة سحابية محلية لتحديث كل الأجهزة في نفس اللحظة (BroadcastChannel + LocalStorage Events)
+        const gameChannel = new BroadcastChannel('talabat_tycoon_sync_channel');
+        gameChannel.onmessage = (event) => {
+            const data = event.data;
+            if (data.type === 'UPDATE_PLAYERS') {
+                allPlayersDB = data.payload;
+                if(activeModalSection === 'top-players-section-modal') renderModalBody();
+            } else if (data.type === 'NEW_BROADCAST') {
+                localStorage.setItem('game_active_broadcast', data.payload);
+                checkBroadcastNotification();
+            } else if (data.type === 'NEW_MISSION') {
+                customMissions = data.payload;
+                localStorage.setItem('game_global_missions', JSON.stringify(customMissions));
+                showNotification('🎯 وصلت مهمة جديدة من الإدارة!');
+                if(activeModalSection === 'missions-section-modal') renderModalBody();
+            }
+        };
+
+        let candidatesMarket = [
+            { name: "كابتن إسلام", speedMs: 9000, salaryCost: 40, vehicle: "موتوسيكل سريع" },
+            { name: "كابتن حودة", speedMs: 11000, salaryCost: 30, vehicle: "سكوتر خفيف" },
+            { name: "كابتن سعيد", speedMs: 14000, salaryCost: 20, vehicle: "عجلة دليفري" }
+        ];
+
+        let balance = 500;
+        let totalRevenue = 0;
+        let taxDue = 0;
+        let rating = 4.8;
+        let level = 1;
+        let xp = 0;
+        let maxXp = 100;
+        let maxFleetSize = 3;
+        let officeLevel = 1;
+        let hasBoxUpgrade = false;
+        let isAdminLoggedIn = false;
+
+        // قاعدة بيانات متزامنة لكل اللاعبين
+        let allPlayersDB = JSON.parse(localStorage.getItem('game_all_players') || JSON.stringify([
+            { name: "أحمد (تجريبي)", balance: 1200, rating: 4.9 },
+            { name: "محمود (تجريبي)", balance: 850, rating: 4.7 }
+        ]));
+
+        let customMissions = JSON.parse(localStorage.getItem('game_global_missions') || JSON.stringify([
+            { id: 1, title: "إتمام أول 3 طلبات توصيل بنجاح", rewardMoney: 100, rewardXp: 30, progress: 0, target: 3, claimed: false },
+            { id: 2, title: "التعاقد مع أول مطعم شراكة حي", rewardMoney: 150, rewardXp: 50, progress: 0, target: 1, claimed: false },
+            { id: 3, title: "سداد أول ضريبة مستحقة للشركة", rewardMoney: 150, rewardXp: 40, progress: 0, target: 1, claimed: false }
+        ]));
+
+        let selectedOrderIndex = null;
+        let map = null;
+        let userLat = 30.0444; 
+        let userLng = 31.2357;
+        let restaurants = []; 
+        let streetsList = [];
+
+        const foodItemsList = ["تكة وجبة دجاج", "بيتزا مشكل جبن", "علبة كشري عائلي", "ساندوتش شاورما دبل", "وجبة برجر مشوي", "طبق كبدة اسكندراني"];
+        const funnyNotes = [
+            "متضربش الجرس جامد عشان العيال نايمة 🤫",
+            "سيب الأكل على الباب واجري بسرعة 🏃‍♂️💨",
+            "معايا فكة 200 جنيه جهز الباقي 💵",
+            "اطلع الدور الرابع والأسانسير عطلان 🪜"
+        ];
+
+        let riders = [
+            { id: 1, name: "كابتن أحمد", speedMs: 12000, salaryCost: 30, status: "متاح", vehicle: "موتوسيكل أساسي", ordersLeft: 10 },
+            { id: 2, name: "كابتن محمود", speedMs: 13000, salaryCost: 25, status: "متاح", vehicle: "سكوتر", ordersLeft: 8 }
+        ];
+
+        let orders = [];
+        let activeModalSection = '';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initEventListeners();
+            checkBroadcastNotification();
+            const savedUser = localStorage.getItem('game_username');
+            if (savedUser) {
+                document.getElementById('userDisplayName').innerText = savedUser;
+                if(savedUser.toLowerCase() === 'admin') isAdminLoggedIn = true;
+                registerPlayerToLeaderboard(savedUser, balance, rating);
+            }
+        });
+
+        function checkBroadcastNotification() {
+            const activeBroadcast = localStorage.getItem('game_active_broadcast');
+            if (activeBroadcast) {
+                document.getElementById('broadcastText').innerText = activeBroadcast;
+                document.getElementById('globalBroadcastBanner').style.display = 'flex';
+                document.getElementById('broadcastDot').style.display = 'block';
+            }
+        }
+
+        function initEventListeners() {
+            document.getElementById('startSplashBtn').addEventListener('click', () => {
+                document.getElementById('welcomeSplash').style.display = 'none';
+                const savedUser = localStorage.getItem('game_username');
+                if (savedUser) {
+                    document.getElementById('userDisplayName').innerText = savedUser;
+                    startMainGame();
+                } else {
+                    document.getElementById('loginScreen').style.display = 'flex';
+                }
+            });
+
+            document.getElementById('loginBtn').addEventListener('click', () => {
+                const input = document.getElementById('usernameInput').value.trim();
+                if (input !== '') {
+                    if (input.toLowerCase() === 'admin') {
+                        const pass = prompt('أدخل كلمة مرور الأدمن:');
+                        if (pass === '1234') {
+                            isAdminLoggedIn = true;
+                            localStorage.setItem('game_username', input);
+                            document.getElementById('userDisplayName').innerText = input;
+                            document.getElementById('loginScreen').style.display = 'none';
+                            registerPlayerToLeaderboard(input, balance, rating);
+                            startMainGame();
+                            showNotification('تم تسجيل دخول الأدمن بنجاح 🛠️');
+                        } else {
+                            alert('كلمة المرور غير صحيحة!');
+                            return;
+                        }
+                    } else {
+                        localStorage.setItem('game_username', input);
+                        document.getElementById('userDisplayName').innerText = input;
+                        document.getElementById('loginScreen').style.display = 'none';
+                        registerPlayerToLeaderboard(input, balance, rating);
+                        startMainGame();
+                    }
+                } else {
+                    alert('الرجاء إدخال اسم المدير العام!');
+                }
+            });
+
+            const sidebar = document.getElementById('sidebarMenu');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            document.getElementById('openSidebarBtn').addEventListener('click', () => {
+                sidebar.classList.add('open');
+                overlay.classList.add('open');
+            });
+
+            document.getElementById('closeSidebarBtn').addEventListener('click', closeSidebar);
+            overlay.addEventListener('click', closeSidebar);
+
+            function closeSidebar() {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('open');
+            }
+
+            document.querySelectorAll('.sidebar-tab-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    closeSidebar();
+                    openContentModal(e.currentTarget.getAttribute('data-target'));
+                });
+            });
+
+            document.getElementById('closeContentModalBtn').addEventListener('click', () => {
+                document.getElementById('contentModal').style.display = 'none';
+            });
+            document.getElementById('closeRiderModalBtn').addEventListener('click', () => {
+                document.getElementById('riderModal').style.display = 'none';
+            });
+            document.getElementById('closeHireModalBtn').addEventListener('click', closeHireModal);
+            document.getElementById('closeHireModalBtn2').addEventListener('click', closeHireModal);
+
+            document.getElementById('closeBroadcastBtn').addEventListener('click', () => {
+                document.getElementById('globalBroadcastBanner').style.display = 'none';
+                document.getElementById('broadcastDot').style.display = 'none';
+            });
+
+            document.getElementById('headerBroadcastBtn').addEventListener('click', () => {
+                const msg = localStorage.getItem('game_active_broadcast');
+                if(msg) alert("📢 إشعار الإدارة الحالي:\n\n" + msg);
+                else alert("لا توجد إشعارات جديدة حالياً.");
+            });
+
+            setInterval(() => { generateOrder(); }, 5000);
+        }
+
+        function registerPlayerToLeaderboard(name, curBalance, curRating) {
+            let existing = allPlayersDB.find(p => p.name === name);
+            if (existing) {
+                existing.balance = curBalance;
+                existing.rating = curRating;
+            } else {
+                allPlayersDB.push({ name: name, balance: curBalance, rating: curRating });
+            }
+            localStorage.setItem('game_all_players', JSON.stringify(allPlayersDB));
+            // مزامنة فورية لكل المتاجر المفتوحة واللاعبين
+            gameChannel.postMessage({ type: 'UPDATE_PLAYERS', payload: allPlayersDB });
+        }
+
+        function startMainGame() {
+            logMsg(`🚀 جاري رصد إحداثيات GPS وسحب المحلات والشوارع المحيطة...`);
+            
+            let gpsResolved = false;
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        if (!gpsResolved) {
+                            gpsResolved = true;
+                            userLat = position.coords.latitude;
+                            userLng = position.coords.longitude;
+                            document.getElementById('cityNameDisplay').innerText = "📍 موقعك (GPS مباشر)";
+                            initMap(userLat, userLng);
+                            fetchLiveLocationData(userLat, userLng);
+                        }
+                    },
+                    (error) => {
+                        if (!gpsResolved) {
+                            gpsResolved = true;
+                            initMap(userLat, userLng);
+                            loadFallbackData(userLat, userLng);
+                        }
+                    },
+                    { enableHighAccuracy: false, timeout: 3000, maximumAge: 10000 }
+                );
+            }
+
+            setTimeout(() => {
+                if (!gpsResolved) {
+                    gpsResolved = true;
+                    initMap(userLat, userLng);
+                    loadFallbackData(userLat, userLng);
+                }
+            }, 1500);
+        }
+
+        function fetchLiveLocationData(lat, lng) {
+            const query = `[out:json][timeout:6];(
+                node["amenity"="restaurant"](around:3500,${lat},${lng});
+                node["amenity"="fast_food"](around:3500,${lat},${lng});
+                node["amenity"="cafe"](around:3500,${lat},${lng});
+                way["highway"](around:2000,${lat},${lng});
+            );out body;`;
+            const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
+
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.elements) {
+                        restaurants = [];
+                        streetsList = [];
+
+                        data.elements.forEach(el => {
+                            let name = el.tags && (el.tags.name || el.tags['name:ar'] || el.tags['name:en']);
+                            if (name) {
+                                if (el.tags.amenity) {
+                                    restaurants.push({
+                                        id: el.id,
+                                        name: name,
+                                        item: foodItemsList[Math.floor(Math.random() * foodItemsList.length)],
+                                        price: Math.floor(Math.random() * 90) + 60,
+                                        contractType: null,
+                                        ordersLeft: 0,
+                                        icon: "🍔",
+                                        lat: el.lat || (el.bounds ? el.bounds.minlat : lat + (Math.random()-0.5)*0.01),
+                                        lng: el.lon || (el.bounds ? el.bounds.minlon : lng + (Math.random()-0.5)*0.01)
+                                    });
+                                } else if (el.tags.highway) {
+                                    if (!streetsList.includes(name)) {
+                                        streetsList.push(name);
+                                    }
+                                }
+                            }
+                        });
+
+                        if (restaurants.length === 0 || streetsList.length === 0) {
+                            loadFallbackData(lat, lng);
+                        } else {
+                            logMsg(`✅ تم رصد ${restaurants.length} مطعم و ${streetsList.length} شارع حقيقي في منطقتك!`);
+                            updateRestaurantBadge();
+                            addRestaurantMarkersToMap();
+                        }
+                    } else {
+                        loadFallbackData(lat, lng);
+                    }
+                })
+                .catch(err => {
+                    loadFallbackData(lat, lng);
+                });
+        }
+
+        function loadFallbackData(lat, lng) {
+            restaurants = [
+                { id: 1, name: "مطعم البرنس الحي", item: "تكة وجبة دجاج", price: 140, contractType: null, ordersLeft: 0, icon: "🍗", lat: lat + 0.003, lng: lng + 0.003 },
+                { id: 2, name: "بيتزا كوين المحلية", item: "بيتزا وسط مشكل", price: 120, contractType: null, ordersLeft: 0, icon: "🍕", lat: lat - 0.003, lng: lng - 0.003 },
+                { id: 3, name: "كشري الزعيم", item: "علبة كشري عائلي", price: 65, contractType: null, ordersLeft: 0, icon: "🍲", lat: lat + 0.004, lng: lng - 0.002 },
+                { id: 4, name: "شاورما أبو أدهم", item: "ساندوتش شاورما دبل", price: 85, contractType: null, ordersLeft: 0, icon: "🌯", lat: lat - 0.004, lng: lng + 0.002 },
+                { id: 5, name: "برجر كنج وست", item: "وجبة برجر مشوي", price: 160, contractType: null, ordersLeft: 0, icon: "🍔", lat: lat + 0.002, lng: lng + 0.005 },
+                { id: 6, name: "كبدة المحطة", item: "طبق كبدة اسكندراني", price: 55, contractType: null, ordersLeft: 0, icon: "🥩", lat: lat - 0.002, lng: lng - 0.005 }
+            ];
+            streetsList = ["شارع المحطة الرئيسي", "شارع التجارة", "شارع الوحدة", "شارع النيل", "شارع الجمهورية"];
+            logMsg(`✅ تم تحميل المحلات والشوارع الافتراضية بنجاح.`);
+            updateRestaurantBadge();
+            addRestaurantMarkersToMap();
+        }
+
+        function updateRestaurantBadge() {
+            const badge = document.getElementById('restaurantCountBadge');
+            if (badge) badge.innerText = restaurants.length;
+        }
+
+        function initMap(lat, lng) {
+            if (map !== null) {
+                map.remove();
+                map = null;
+            }
+            map = L.map('map', { zoomControl: false }).setView([lat, lng], 14);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+            const hqIcon = L.divIcon({ html: '<div class="map-icon" style="border-color:#10b981;">🏢</div>', className: '' });
+            L.marker([lat, lng], { icon: hqIcon }).addTo(map).bindPopup('مقر الشركة الرئيسي').openPopup();
+            
+            setTimeout(() => { 
+                if(map) map.invalidateSize(); 
+            }, 250);
+            updateUI();
+        }
+
+        function addRestaurantMarkersToMap() {
+            if (!map) return;
+            restaurants.forEach(r => {
+                const restIcon = L.divIcon({ html: `<div class="map-icon">${r.icon}</div>`, className: '' });
+                L.marker([r.lat, r.lng], { icon: restIcon }).addTo(map).bindPopup(`<b>${r.name}</b><br>متوسط السعر: ${r.price}ج`);
+            });
+        }
+
+        function openContentModal(sectionKey) {
+            if (sectionKey === 'admin-section-modal' && !isAdminLoggedIn) {
+                alert('غير مسموح بالدخول، هذه لوحة خاصة بالأدمن فقط!');
+                return;
+            }
+            activeModalSection = sectionKey;
+            const modal = document.getElementById('contentModal');
+            const titleEl = document.getElementById('modalTitle');
+            
+            if (sectionKey === 'ops-section-modal') titleEl.innerText = 'إدارة الطلبات الواردة';
+            else if (sectionKey === 'partners-section-modal') titleEl.innerText = `مطاعم الشراكة الحية (${restaurants.length} متاح)`;
+            else if (sectionKey === 'fleet-section-modal') titleEl.innerText = 'أسطول التوصيل (المناديب)';
+            else if (sectionKey === 'finance-section-modal') titleEl.innerText = 'المالية وحسابات الشركة';
+            else if (sectionKey === 'upgrades-section-modal') titleEl.innerText = 'تطويرات الشركة';
+            else if (sectionKey === 'missions-section-modal') titleEl.innerText = 'المهمات والإنجازات';
+            else if (sectionKey === 'top-players-section-modal') titleEl.innerText = 'لوحة شرف المديرين (التوب)';
+            else if (sectionKey === 'admin-section-modal') titleEl.innerText = 'لوحة تحكم الأدمن العامة 🛠️';
+
+            renderModalBody();
+            modal.style.display = 'flex';
+        }
+
+        function renderModalBody() {
+            const container = document.getElementById('modalBodyContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            if (activeModalSection === 'ops-section-modal') {
+                if (orders.length === 0) {
+                    container.innerHTML = '<div class="text-center text-xs text-gray-400 py-6">لا توجد طلبات واردة حالياً... انتظر ثوانٍ</div>';
+                    return;
+                }
+                orders.forEach((o, index) => {
+                    const isContracted = o.restaurantObj.contractType !== null;
+                    const netProfit = isContracted ? Math.floor(o.price * 0.35) : Math.floor(o.price * 0.15);
+                    const div = document.createElement('div');
+                    div.className = `bg-slate-900 border-l-4 ${isContracted ? 'border-orange-500' : 'border-rose-500'} p-2.5 rounded-xl text-xs mb-2 text-right`;
+                    div.innerHTML = `
+                        <div class="flex justify-between font-bold mb-1">
+                            <span class="text-[9px] ${isContracted ? 'text-emerald-400' : 'text-rose-400'}">${isContracted ? '🤝 شريك' : '⚠️ عادي'}</span>
+                            <span>${o.icon} ${o.restaurant}</span>
+                        </div>
+                        <div class="text-gray-300 text-[10px] mb-1">📍 ${o.street} | 🛍️ ${o.item}</div>
+                        <div class="text-[10px] text-amber-300 mb-1">📝 ${o.note}</div>
+                        <div class="flex justify-between items-center text-[10px] my-1">
+                            <span class="text-emerald-400 font-bold">صافي الربح: +${netProfit}ج</span>
+                            <span>السعر: <b>${o.price}ج</b></span>
+                        </div>
+                        <div class="flex gap-1.5 mt-1">
+                            <button type="button" class="modal-reject-btn bg-rose-500/20 text-rose-300 px-2.5 py-1 rounded text-[11px] cursor-pointer" data-index="${index}">رفض ❌</button>
+                            <button type="button" class="modal-assign-btn flex-1 bg-orange-500 text-slate-950 font-black py-1 rounded text-[11px] cursor-pointer" data-index="${index}">إسناد لمندوب 🚀</button>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+
+                container.querySelectorAll('.modal-assign-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.getElementById('contentModal').style.display = 'none';
+                        openRiderModal(parseInt(e.currentTarget.dataset.index));
+                    });
+                });
+                container.querySelectorAll('.modal-reject-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        rejectOrder(parseInt(e.currentTarget.dataset.index));
+                        renderModalBody();
+                    });
+                });
+
+            } else if (activeModalSection === 'partners-section-modal') {
+                container.innerHTML = `<p class="text-[10px] text-gray-400 mb-2 text-right">🤝 مطاعم منطقتك المتاحة للشراكة (${restaurants.length}):</p>`;
+                restaurants.forEach((r, idx) => {
+                    const div = document.createElement('div');
+                    div.className = 'glass-panel p-2.5 rounded-xl flex justify-between items-center text-xs mb-2';
+                    div.innerHTML = `
+                        <div>${r.contractType ? `<span class="text-emerald-400 text-[10px] font-bold">متعاقد ✅</span>` : `<button type="button" class="contract-btn bg-emerald-600 text-white px-2.5 py-1 rounded text-[10px] font-bold cursor-pointer" data-index="${idx}">تعاقد (150ج)</button>`}</div>
+                        <div class="text-right">
+                            <strong class="text-white">${r.icon} ${r.name}</strong>
+                            <div class="text-[10px] text-gray-400">متوسط السعر: ${r.price}ج</div>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+
+                container.querySelectorAll('.contract-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        contractRestaurant(parseInt(e.currentTarget.dataset.index));
+                        renderModalBody();
+                    });
+                });
+
+            } else if (activeModalSection === 'fleet-section-modal') {
+                container.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <button id="modalOpenHireBtn" type="button" class="bg-orange-500 text-slate-950 px-2.5 py-1 rounded-lg font-black text-[10px] cursor-pointer">+ تعيين مندوب</button>
+                        <p class="text-[10px] text-gray-400">🛵 مناديب المكتب (الحد الأقصى: ${maxFleetSize}):</p>
+                    </div>
+                `;
+                const fleetList = document.createElement('div');
+                fleetList.className = 'flex flex-col gap-2';
+                riders.forEach((r, rIdx) => {
+                    const riderCard = document.createElement('div');
+                    riderCard.className = 'glass-panel p-2.5 rounded-xl flex justify-between items-center text-xs';
+                    riderCard.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] ${r.status === 'متاح' ? 'text-emerald-400' : 'text-amber-400'}">${r.status}</span>
+                            <button type="button" class="fire-btn bg-rose-600/80 text-white px-2 py-1 rounded text-[9px] cursor-pointer" data-index="${rIdx}">فصل</button>
+                        </div>
+                        <div class="text-right">
+                            <strong class="text-white">${r.name}</strong>
+                            <div class="text-[9px] text-gray-400">${r.vehicle} | مرتب: ${r.salaryCost}ج</div>
+                        </div>
+                    `;
+                    fleetList.appendChild(riderCard);
+                });
+                container.appendChild(fleetList);
+
+                document.getElementById('modalOpenHireBtn').addEventListener('click', () => {
+                    document.getElementById('contentModal').style.display = 'none';
+                    openHireModal();
+                });
+
+                container.querySelectorAll('.fire-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        fireRider(parseInt(e.currentTarget.dataset.index));
+                        renderModalBody();
+                    });
+                });
+
+            } else if (activeModalSection === 'finance-section-modal') {
+                let totalSalaries = riders.reduce((acc, r) => acc + r.salaryCost, 0);
+                container.innerHTML = `
+                    <div class="glass-panel p-3 rounded-xl border border-amber-500/30 mb-2">
+                        <h4 class="text-xs font-bold text-amber-400 mb-2 text-right">تقرير الأداء المالي</h4>
+                        <div class="flex flex-col gap-1.5 text-[11px]">
+                            <div class="flex justify-between border-b border-slate-800 pb-1"><span class="text-emerald-400 font-bold">${totalRevenue}ج</span><span class="text-gray-400">إجمالي الأرباح:</span></div>
+                            <div class="flex justify-between border-b border-slate-800 pb-1"><span class="text-rose-400 font-bold">${totalSalaries}ج</span><span class="text-gray-400">المرتبات:</span></div>
+                            <div class="flex justify-between border-b border-slate-800 pb-1"><span class="text-amber-400 font-bold">${taxDue}ج</span><span class="text-gray-400">الضرائب:</span></div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" id="modalLoanBtn" class="flex-1 bg-slate-800 text-amber-400 py-2 rounded-xl text-[11px] font-bold cursor-pointer">قرض طوارئ (500ج)</button>
+                        <button type="button" id="modalPayTaxBtn" class="flex-1 bg-rose-600 text-white py-2 rounded-xl text-[11px] font-bold cursor-pointer">سداد الضرائب 🧾</button>
+                    </div>
+                `;
+                document.getElementById('modalPayTaxBtn').addEventListener('click', payTaxes);
+                document.getElementById('modalLoanBtn').addEventListener('click', takeLoan);
+
+            } else if (activeModalSection === 'upgrades-section-modal') {
+                container.innerHTML = `
+                    <div class="flex flex-col gap-2.5">
+                        <div class="glass-panel p-3 rounded-xl flex justify-between items-center text-xs">
+                            <button type="button" id="modalOfficeBtn" class="bg-emerald-600 text-white font-bold px-2.5 py-1.5 rounded-lg text-[10px] cursor-pointer">توسعة (500ج)</button>
+                            <div class="text-right"><strong class="text-white">توسعة المكتب</strong><p class="text-[9px] text-gray-400">السعة: ${maxFleetSize}</p></div>
+                        </div>
+                        <div class="glass-panel p-3 rounded-xl flex justify-between items-center text-xs">
+                            <button type="button" id="modalBoxBtn" class="bg-emerald-600 text-white font-bold px-2.5 py-1.5 rounded-lg text-[10px] cursor-pointer" ${hasBoxUpgrade ? 'disabled' : ''}>${hasBoxUpgrade ? 'مفعل ✅' : 'شراء (350ج)'}</button>
+                            <div class="text-right"><strong class="text-white">صندوق حراري</strong></div>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('modalOfficeBtn').addEventListener('click', upgradeOffice);
+                document.getElementById('modalBoxBtn').addEventListener('click', () => { upgradeBox(); renderModalBody(); });
+
+            } else if (activeModalSection === 'missions-section-modal') {
+                container.innerHTML = '<p class="text-[10px] text-gray-400 mb-2 text-right">🎯 المهمات المتاحة:</p>';
+                const mList = document.createElement('div');
+                mList.className = 'flex flex-col gap-2';
+                customMissions.forEach((m, idx) => {
+                    const percent = Math.min(100, (m.progress / m.target) * 100);
+                    const item = document.createElement('div');
+                    item.className = 'glass-panel p-3 rounded-xl flex flex-col gap-2 text-xs';
+                    item.innerHTML = `
+                        <div class="flex justify-between items-center"><span class="text-[10px] text-amber-400">${m.progress}/${m.target}</span><span class="font-bold text-white">${m.title}</span></div>
+                        <div class="w-full bg-slate-900 h-1.5 rounded-full"><div class="bg-orange-500 h-full" style="width: ${percent}%"></div></div>
+                        <button type="button" class="modal-claim-btn w-full py-1.5 rounded-lg text-[10px] font-bold ${m.claimed || m.progress < m.target ? 'bg-slate-800 text-gray-400' : 'bg-emerald-600 text-white cursor-pointer'}" data-index="${idx}" ${m.claimed || m.progress < m.target ? 'disabled' : ''}>${m.claimed ? 'تم الاستلام' : `استلام (${m.rewardMoney}ج)`}</button>
+                    `;
+                    mList.appendChild(item);
+                });
+                container.appendChild(mList);
+                container.querySelectorAll('.modal-claim-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => { claimMissionReward(parseInt(e.currentTarget.dataset.index)); renderModalBody(); });
+                });
+
+            } else if (activeModalSection === 'top-players-section-modal') {
+                container.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        ${isAdminLoggedIn ? '<button type="button" id="openAdminFromTopBtn" class="bg-rose-600 text-white px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer">لوحة تحكم الأدمن 🛠️</button>' : ''}
+                        <p class="text-[10px] text-gray-400">🏆 لوحة شرف جميع اللاعبين (متزامن حياً):</p>
+                    </div>
+                `;
+                const playersList = document.createElement('div');
+                playersList.className = 'flex flex-col gap-2';
+                
+                // جلب أحدث بيانات مدعومة من التخزين المشترك
+                let latestPlayers = JSON.parse(localStorage.getItem('game_all_players') || JSON.stringify(allPlayersDB));
+                latestPlayers.sort((a, b) => b.balance - a.balance);
+
+                latestPlayers.forEach((p, idx) => {
+                    const item = document.createElement('div');
+                    item.className = 'glass-panel p-2.5 rounded-xl flex items-center justify-between text-xs';
+                    item.innerHTML = `<span class="text-emerald-400 font-bold">${p.balance}ج</span><span class="font-bold text-white">${idx + 1}. ${p.name}</span>`;
+                    playersList.appendChild(item);
+                });
+                container.appendChild(playersList);
+
+                const adminBtn = document.getElementById('openAdminFromTopBtn');
+                if (adminBtn) {
+                    adminBtn.addEventListener('click', () => {
+                        openContentModal('admin-section-modal');
+                    });
+                }
+
+            } else if (activeModalSection === 'admin-section-modal') {
+                container.innerHTML = `
+                    <div class="flex flex-col gap-3">
+                        <div class="glass-panel p-3 rounded-xl border border-rose-500/30">
+                            <h4 class="text-xs font-bold text-rose-400 mb-2 text-right">➕ إضافة مهمة جديدة (تظهر لكل اللاعبين)</h4>
+                            <input type="text" id="adminMissionTitle" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-2 rounded-lg mb-2 outline-none text-right" placeholder="عنوان المهمة (مثال: أكمل 5 طلبات)">
+                            <div class="flex gap-2 mb-2">
+                                <input type="number" id="adminMissionTarget" class="w-1/2 bg-slate-900 border border-slate-700 text-white text-xs p-2 rounded-lg outline-none text-right" placeholder="الهدف (العدد)">
+                                <input type="number" id="adminMissionReward" class="w-1/2 bg-slate-900 border border-slate-700 text-white text-xs p-2 rounded-lg outline-none text-right" placeholder="الجائزة كاش (ج)">
+                            </div>
+                            <button type="button" id="adminAddMissionBtn" class="w-full bg-orange-500 text-slate-950 font-black py-2 rounded-lg text-xs cursor-pointer">نشر المهمة لكل اللاعبين</button>
+                        </div>
+
+                        <div class="glass-panel p-3 rounded-xl border border-orange-500/30">
+                            <h4 class="text-xs font-bold text-orange-400 mb-2 text-right">📢 إرسال إشعار عام لكل الحسابات</h4>
+                            <textarea id="adminBroadcastInput" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-2 rounded-lg mb-2 outline-none h-20 resize-none text-right" placeholder="اكتب نص الإشعار هنا..."></textarea>
+                            <button type="button" id="adminSendBroadcastBtn" class="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 font-black py-2 rounded-lg text-xs cursor-pointer">إرسال الإشعار الفوري 🚀</button>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('adminAddMissionBtn').addEventListener('click', () => {
+                    const title = document.getElementById('adminMissionTitle').value.trim();
+                    const reward = parseInt(document.getElementById('adminMissionReward').value);
+                    const target = parseInt(document.getElementById('adminMissionTarget').value);
+                    if(title && reward && target) {
+                        const newMission = { id: Date.now(), title, rewardMoney: reward, rewardXp: 40, progress: 0, target, claimed: false };
+                        customMissions.push(newMission);
+                        localStorage.setItem('game_global_missions', JSON.stringify(customMissions));
+                        
+                        // بث المهمة لكل الأجهزة المفتوحة في نفس اللحظة
+                        gameChannel.postMessage({ type: 'NEW_MISSION', payload: customMissions });
+
+                        showNotification('تم نشر المهمة الجديدة بنجاح لكل اللاعبين!');
+                        document.getElementById('contentModal').style.display = 'none';
+                    } else {
+                        alert('برجاء ملء جميع بيانات المهمة بشكل صحيح.');
+                    }
+                });
+
+                document.getElementById('adminSendBroadcastBtn').addEventListener('click', () => {
+                    const text = document.getElementById('adminBroadcastInput').value.trim();
+                    if(text) {
+                        localStorage.setItem('game_active_broadcast', text);
+                        
+                        // بث الإشعار لكل الأجهزة المفتوحة في نفس اللحظة
+                        gameChannel.postMessage({ type: 'NEW_BROADCAST', payload: text });
+
+                        checkBroadcastNotification();
+                        showNotification('تم إرسال الإشعار لكل اللاعبين بنجاح!');
+                        document.getElementById('contentModal').style.display = 'none';
+                    } else {
+                        alert('برجاء كتابة نص الإشعار.');
+                    }
+                });
+            }
+        }
+
+        function showNotification(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        }
+
+        function addXp(amount) {
+            xp += amount;
+            if (xp >= maxXp) {
+                xp -= maxXp;
+                level++;
+                maxXp = Math.floor(maxXp * 1.5);
+                showNotification(`⭐ مبروك! ارتفع مستوى الشركة إلى Level ${level}!`);
+            }
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('balance').innerText = balance;
+            document.getElementById('mgrLevel').innerText = level;
+            document.getElementById('taxDueDisplay').innerText = taxDue + 'ج';
+
+            const username = localStorage.getItem('game_username') || 'المدير';
+            registerPlayerToLeaderboard(username, balance, rating);
+
+            const ordersContainer = document.getElementById('orders-container');
+            ordersContainer.innerHTML = '';
+            document.getElementById('orders-count').innerText = `${orders.length} طلبات`;
+
+            orders.forEach((o, index) => {
+                const isContracted = o.restaurantObj.contractType !== null;
+                const netProfit = isContracted ? Math.floor(o.price * 0.35) : Math.floor(o.price * 0.15);
+
+                const orderCard = document.createElement('div');
+                orderCard.className = `bg-slate-900 border-l-4 ${isContracted ? 'border-orange-500' : 'border-rose-500'} p-2.5 rounded-xl text-xs text-right`;
+                orderCard.innerHTML = `
+                    <div class="flex justify-between font-bold mb-1">
+                        <span class="text-[9px] ${isContracted ? 'text-emerald-400' : 'text-rose-400'}">${isContracted ? '🤝 شريك' : '⚠️ عادي'}</span>
+                        <span>${o.icon} ${o.restaurant}</span>
+                    </div>
+                    <div class="text-gray-300 text-[10px] mb-1">📍 ${o.street} | 🛍️ ${o.item}</div>
+                    <div class="text-[10px] text-amber-300 mb-1">📝 ${o.note}</div>
+                    <div class="flex justify-between items-center text-[10px] my-1">
+                        <span class="text-emerald-400 font-bold">صافي الربح: +${netProfit}ج</span>
+                        <span>السعر: <b>${o.price}ج</b></span>
+                    </div>
+                    <div class="flex gap-1.5 mt-1">
+                        <button type="button" class="reject-btn bg-rose-500/20 text-rose-300 px-2.5 py-1 rounded text-[11px] cursor-pointer" data-index="${index}">رفض ❌</button>
+                        <button type="button" class="assign-btn flex-1 bg-orange-500 text-slate-950 font-black py-1 rounded text-[11px] cursor-pointer" data-index="${index}">إسناد لمندوب 🚀</button>
+                    </div>
+                `;
+                ordersContainer.appendChild(orderCard);
+            });
+
+            document.querySelectorAll('.assign-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => openRiderModal(parseInt(e.currentTarget.dataset.index)));
+            });
+            document.querySelectorAll('.reject-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => rejectOrder(parseInt(e.currentTarget.dataset.index)));
+            });
+        }
+
+        function payTaxes() {
+            if (taxDue <= 0) { showNotification('ليس عليك أي مستحقات حالياً!'); return; }
+            if (balance >= taxDue) {
+                balance -= taxDue;
+                showNotification(`تم سداد الضرائب بقيمة ${taxDue} جنيه.`);
+                taxDue = 0;
+                updateUI();
+                if(document.getElementById('contentModal').style.display === 'flex') renderModalBody();
+            } else { showNotification('رصيدك لا يكفي لسداد الضرائب!'); }
+        }
+
+        function takeLoan() {
+            balance += 500;
+            taxDue += 150;
+            showNotification('تم الحصول على قرض طوارئ بقيمة 500ج.');
+            updateUI();
+            if(document.getElementById('contentModal').style.display === 'flex') renderModalBody();
+        }
+
+        function claimMissionReward(index) {
+            const m = customMissions[index];
+            if (m.claimed || m.progress < m.target) return;
+            m.claimed = true;
+            balance += m.rewardMoney;
+            addXp(m.rewardXp);
+            showNotification(`حصلت على ${m.rewardMoney} جنيه!`);
+            updateUI();
+        }
+
+        function logMsg(text) {
+            const logsBox = document.getElementById('logs-box');
+            if(logsBox) {
+                logsBox.innerHTML += `> ${text}<br>`;
+                logsBox.scrollTop = logsBox.scrollHeight;
+            }
+        }
+
+        function contractRestaurant(index) {
+            const rest = restaurants[index];
+            if (balance >= 150) {
+                balance -= 150;
+                rest.contractType = 'basic';
+                rest.ordersLeft = 10;
+                customMissions.forEach(m => { if (m.title.includes('مطعم') && m.progress < m.target) m.progress++; });
+                showNotification(`تم التعاقد مع ${rest.name}!`);
+                updateUI();
+            } else { alert('رصيد غير كافٍ!'); }
+        }
+
+        function upgradeOffice() {
+            if (balance >= 500) {
+                balance -= 500;
+                officeLevel++;
+                maxFleetSize += 2;
+                showNotification(`تمت توسعة المكتب!`);
+                updateUI();
+                if(document.getElementById('contentModal').style.display === 'flex') renderModalBody();
+            } else { alert('تحتاج 500ج!'); }
+        }
+
+        function upgradeBox() {
+            if (hasBoxUpgrade) return;
+            if (balance >= 350) { balance -= 350; hasBoxUpgrade = true; showNotification('تم تركيب الصندوق الحراري!'); updateUI(); }
+            else { alert('رصيد غير كافٍ!'); }
+        }
+
+        function openHireModal() {
+            if (riders.length >= maxFleetSize) { alert('وصلت للحد الأقصى للمناديب!'); return; }
+            const container = document.getElementById('candidates-container');
+            container.innerHTML = '';
+            candidatesMarket.forEach((cand, idx) => {
+                const hireRow = document.createElement('div');
+                hireRow.className = 'bg-slate-900 p-2.5 rounded-xl flex justify-between items-center text-xs';
+                hireRow.innerHTML = `<button type="button" class="hire-btn bg-orange-500 text-slate-950 font-black py-1 px-2.5 rounded text-[10px] cursor-pointer" data-index="${idx}">توظيف</button><span>${cand.name} (${cand.salaryCost}ج)</span>`;
+                container.appendChild(hireRow);
+            });
+            container.querySelectorAll('.hire-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => hireCandidate(parseInt(e.currentTarget.dataset.index)));
+            });
+            document.getElementById('hireModal').style.display = 'flex';
+        }
+
+        function closeHireModal() { document.getElementById('hireModal').style.display = 'none'; }
+
+        function hireCandidate(index) {
+            const cand = candidatesMarket[index];
+            if (balance >= cand.salaryCost) {
+                balance -= cand.salaryCost;
+                riders.push({ id: Date.now(), name: cand.name, speedMs: cand.speedMs, salaryCost: cand.salaryCost, status: 'متاح', vehicle: cand.vehicle, ordersLeft: 12 });
+                candidatesMarket.splice(index, 1);
+                closeHireModal();
+                showNotification(`انضم ${cand.name} لمكتبك!`);
+                updateUI();
+            } else { alert('رصيد غير كافٍ!'); }
+        }
+
+        function fireRider(index) {
+            if (confirm('هل تريد فصل هذا المندوب؟')) { riders.splice(index, 1); updateUI(); }
+        }
+
+        function rejectOrder(index) { orders.splice(index, 1); updateUI(); }
+
+        function openRiderModal(orderIndex) {
+            selectedOrderIndex = orderIndex;
+            const freeRiders = riders.filter(r => r.status === 'متاح' && r.ordersLeft > 0);
+            if (freeRiders.length === 0) { alert('لا يوجد مناديب متاحون!'); return; }
+            const modalList = document.getElementById('modal-riders-list');
+            modalList.innerHTML = '';
+            freeRiders.forEach(r => {
+                const rItem = document.createElement('div');
+                rItem.className = 'glass-panel p-2 rounded-xl flex justify-between items-center cursor-pointer text-xs dispatch-rider-item';
+                rItem.dataset.id = r.id;
+                rItem.innerHTML = `<span class="text-emerald-400 font-bold">إرسال ➔</span><span>${r.name}</span>`;
+                modalList.appendChild(rItem);
+            });
+            document.querySelectorAll('.dispatch-rider-item').forEach(item => {
+                item.addEventListener('click', (e) => confirmDispatch(parseInt(e.currentTarget.dataset.id)));
+            });
+            document.getElementById('riderModal').style.display = 'flex';
+        }
+
+        function confirmDispatch(riderId) {
+            document.getElementById('riderModal').style.display = 'none';
+            const rider = riders.find(r => r.id === riderId);
+            const order = orders[selectedOrderIndex];
+            orders.splice(selectedOrderIndex, 1);
+
+            rider.status = 'مشغول';
+            rider.ordersLeft--;
+            updateUI();
+
+            let deliveryTime = rider.speedMs;
+            let netProfit = order.restaurantObj.contractType ? Math.floor(order.price * 0.35) : Math.floor(order.price * 0.15);
+
+            const restLat = order.restaurantObj.lat;
+            const restLng = order.restaurantObj.lng;
+            const custLat = userLat + (Math.random() - 0.5) * 0.01;
+            const custLng = userLng + (Math.random() - 0.5) * 0.01;
+
+            if (!map) return;
+
+            const restMarker = L.marker([restLat, restLng], { icon: L.divIcon({ html: `<div class="map-icon">${order.icon}</div>`, className: '' }) }).addTo(map);
+            const custMarker = L.marker([custLat, custLng], { icon: L.divIcon({ html: '<div class="map-icon">🏠</div>', className: '' }) }).addTo(map);
+            const motoMarker = L.marker([userLat, userLng], { icon: L.divIcon({ html: '<div class="map-icon">🛵</div>', className: '' }) }).addTo(map);
+
+            animateMarker(motoMarker, [userLat, userLng], [restLat, restLng], deliveryTime * 0.4, () => {
+                animateMarker(motoMarker, [restLat, restLng], [custLat, custLng], deliveryTime * 0.6, () => {
+                    if(map) {
+                        map.removeLayer(restMarker);
+                        map.removeLayer(custMarker);
+                        map.removeLayer(motoMarker);
+                    }
+                    balance += netProfit;
+                    totalRevenue += netProfit;
+                    taxDue += Math.floor(netProfit * 0.20);
+                    addXp(25);
+                    
+                    customMissions.forEach(m => {
+                        if(m.title.includes('طلب') && m.progress < m.target) m.progress++;
+                    });
+
+                    rider.status = 'متاح';
+                    showNotification(`تم التسليم بنجاح! أرباحك: +${netProfit}ج`);
+                    updateUI();
+                });
+            });
+        }
+
+        function animateMarker(marker, startLatLng, endLatLng, duration, onComplete) {
+            const startTime = Date.now();
+            function step() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(1, elapsed / duration);
+                const curLat = startLatLng[0] + (endLatLng[0] - startLatLng[0]) * progress;
+                const curLng = startLatLng[1] + (endLatLng[1] - startLatLng[1]) * progress;
+                if (marker && typeof marker.setLatLng === 'function') marker.setLatLng([curLat, curLng]);
+                if (progress < 1) requestAnimationFrame(step);
+                else if (onComplete) onComplete();
+            }
+            requestAnimationFrame(step);
+        }
+
+        function generateOrder() {
+            if (orders.length < 5 && restaurants.length > 0 && streetsList.length > 0) {
+                const rest = restaurants[Math.floor(Math.random() * restaurants.length)];
+                const randomStreet = streetsList[Math.floor(Math.random() * streetsList.length)];
+                
+                orders.push({
+                    restaurant: rest.name,
+                    restaurantObj: rest,
+                    item: rest.item,
+                    price: rest.price,
+                    street: randomStreet,
+                    icon: rest.icon,
+                    note: funnyNotes[Math.floor(Math.random() * funnyNotes.length)]
+                });
+                updateUI();
+                if(document.getElementById('contentModal').style.display === 'flex' && activeModalSection === 'ops-section-modal') {
+                    renderModalBody();
+                }
+            }
+        }
+    </script>
+</body>
+</html>
