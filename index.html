@@ -69,7 +69,7 @@
             <div class="text-[10px] text-gray-500 mt-2 relative z-10">Talabat Tycoon Pro Live &copy; 2026</div>
         </div>
 
-        <!-- شاشة تسجيل الدخول مع التحقق من الأدمن وباسورد -->
+        <!-- شاشة تسجيل الدخول -->
         <div id="loginScreen" class="fixed inset-0 bg-slate-950/95 z-[999] flex flex-col items-center justify-center p-6 text-center" style="display: none;">
             <div class="glass-panel p-6 rounded-3xl border border-orange-500/30 w-full max-w-xs shadow-2xl">
                 <div class="w-16 h-16 bg-gradient-to-tr from-orange-600 to-amber-500 rounded-2xl flex items-center justify-center text-3xl text-white mx-auto mb-4 shadow-lg shadow-orange-500/40">
@@ -88,7 +88,6 @@
         <!-- Header Dashboard -->
         <div class="glass-panel px-3 py-2.5 flex flex-col gap-1.5 z-20 border-b border-slate-800 flex-shrink-0">
             <div class="flex items-center justify-between">
-                <!-- أزرار القائمة والإشعارات في اليمين جنب بعض -->
                 <div class="flex items-center gap-1.5">
                     <div id="openSidebarBtn" class="w-9 h-9 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white text-sm font-bold shadow-md shadow-orange-500/30 cursor-pointer">
                         <i class="fa-solid fa-bars"></i>
@@ -99,7 +98,6 @@
                     </button>
                 </div>
 
-                <!-- اسم المستخدم والرصيد -->
                 <div class="flex items-center gap-2">
                     <div class="bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-xl flex items-center gap-1 text-emerald-400 text-xs font-bold">
                         <i class="fa-solid fa-wallet text-amber-400"></i><span id="balance">500</span>ج
@@ -142,7 +140,7 @@
             </div>
         </div>
 
-        <!-- القائمة الجانبية (يمين الشاشة) -->
+        <!-- القائمة الجانبية -->
         <div id="sidebarOverlay"></div>
         <div id="sidebarMenu" class="flex flex-col p-4 overflow-y-auto">
             <div class="flex justify-between items-center pb-3 mb-3 border-b border-slate-800">
@@ -201,24 +199,6 @@
     <script>
         document.addEventListener('contextmenu', event => event.preventDefault());
 
-        // نظام مزامنة سحابية محلية لتحديث كل الأجهزة في نفس اللحظة (BroadcastChannel + LocalStorage Events)
-        const gameChannel = new BroadcastChannel('talabat_tycoon_sync_channel');
-        gameChannel.onmessage = (event) => {
-            const data = event.data;
-            if (data.type === 'UPDATE_PLAYERS') {
-                allPlayersDB = data.payload;
-                if(activeModalSection === 'top-players-section-modal') renderModalBody();
-            } else if (data.type === 'NEW_BROADCAST') {
-                localStorage.setItem('game_active_broadcast', data.payload);
-                checkBroadcastNotification();
-            } else if (data.type === 'NEW_MISSION') {
-                customMissions = data.payload;
-                localStorage.setItem('game_global_missions', JSON.stringify(customMissions));
-                showNotification('🎯 وصلت مهمة جديدة من الإدارة!');
-                if(activeModalSection === 'missions-section-modal') renderModalBody();
-            }
-        };
-
         let candidatesMarket = [
             { name: "كابتن إسلام", speedMs: 9000, salaryCost: 40, vehicle: "موتوسيكل سريع" },
             { name: "كابتن حودة", speedMs: 11000, salaryCost: 30, vehicle: "سكوتر خفيف" },
@@ -237,17 +217,13 @@
         let hasBoxUpgrade = false;
         let isAdminLoggedIn = false;
 
-        // قاعدة بيانات متزامنة لكل اللاعبين
-        let allPlayersDB = JSON.parse(localStorage.getItem('game_all_players') || JSON.stringify([
-            { name: "أحمد (تجريبي)", balance: 1200, rating: 4.9 },
-            { name: "محمود (تجريبي)", balance: 850, rating: 4.7 }
-        ]));
+        let allPlayersDB = [];
 
-        let customMissions = JSON.parse(localStorage.getItem('game_global_missions') || JSON.stringify([
+        let customMissions = [
             { id: 1, title: "إتمام أول 3 طلبات توصيل بنجاح", rewardMoney: 100, rewardXp: 30, progress: 0, target: 3, claimed: false },
             { id: 2, title: "التعاقد مع أول مطعم شراكة حي", rewardMoney: 150, rewardXp: 50, progress: 0, target: 1, claimed: false },
             { id: 3, title: "سداد أول ضريبة مستحقة للشركة", rewardMoney: 150, rewardXp: 40, progress: 0, target: 1, claimed: false }
-        ]));
+        ];
 
         let selectedOrderIndex = null;
         let map = null;
@@ -274,23 +250,13 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             initEventListeners();
-            checkBroadcastNotification();
             const savedUser = localStorage.getItem('game_username');
             if (savedUser) {
                 document.getElementById('userDisplayName').innerText = savedUser;
                 if(savedUser.toLowerCase() === 'admin') isAdminLoggedIn = true;
-                registerPlayerToLeaderboard(savedUser, balance, rating);
+                syncPlayerToMongoDB(savedUser, balance, rating);
             }
         });
-
-        function checkBroadcastNotification() {
-            const activeBroadcast = localStorage.getItem('game_active_broadcast');
-            if (activeBroadcast) {
-                document.getElementById('broadcastText').innerText = activeBroadcast;
-                document.getElementById('globalBroadcastBanner').style.display = 'flex';
-                document.getElementById('broadcastDot').style.display = 'block';
-            }
-        }
 
         function initEventListeners() {
             document.getElementById('startSplashBtn').addEventListener('click', () => {
@@ -314,7 +280,7 @@
                             localStorage.setItem('game_username', input);
                             document.getElementById('userDisplayName').innerText = input;
                             document.getElementById('loginScreen').style.display = 'none';
-                            registerPlayerToLeaderboard(input, balance, rating);
+                            syncPlayerToMongoDB(input, balance, rating);
                             startMainGame();
                             showNotification('تم تسجيل دخول الأدمن بنجاح 🛠️');
                         } else {
@@ -325,7 +291,7 @@
                         localStorage.setItem('game_username', input);
                         document.getElementById('userDisplayName').innerText = input;
                         document.getElementById('loginScreen').style.display = 'none';
-                        registerPlayerToLeaderboard(input, balance, rating);
+                        syncPlayerToMongoDB(input, balance, rating);
                         startMainGame();
                     }
                 } else {
@@ -371,25 +337,40 @@
             });
 
             document.getElementById('headerBroadcastBtn').addEventListener('click', () => {
-                const msg = localStorage.getItem('game_active_broadcast');
-                if(msg) alert("📢 إشعار الإدارة الحالي:\n\n" + msg);
-                else alert("لا توجد إشعارات جديدة حالياً.");
+                alert("لا توجد إشعارات جديدة حالياً.");
             });
 
             setInterval(() => { generateOrder(); }, 5000);
         }
 
-        function registerPlayerToLeaderboard(name, curBalance, curRating) {
-            let existing = allPlayersDB.find(p => p.name === name);
-            if (existing) {
-                existing.balance = curBalance;
-                existing.rating = curRating;
-            } else {
-                allPlayersDB.push({ name: name, balance: curBalance, rating: curRating });
+        // دالة إرسال البيانات وحفظها في MongoDB عبر API السيرفر
+        async function syncPlayerToMongoDB(name, curBalance, curRating) {
+            try {
+                await fetch('/api/players', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: name,
+                        balance: curBalance,
+                        rating: curRating
+                    })
+                });
+            } catch (err) {
+                console.error("خطأ في مزامنة بيانات اللاعب مع السيرفر:", err);
             }
-            localStorage.setItem('game_all_players', JSON.stringify(allPlayersDB));
-            // مزامنة فورية لكل المتاجر المفتوحة واللاعبين
-            gameChannel.postMessage({ type: 'UPDATE_PLAYERS', payload: allPlayersDB });
+        }
+
+        // دالة جلب قائمة كل اللاعبين من MongoDB لتعرضها في لوحة الشرف
+        async function fetchPlayersFromMongoDB() {
+            try {
+                const response = await fetch('/api/players');
+                const data = await response.json();
+                if (Array.isArray(data)) {
+                    allPlayersDB = data;
+                }
+            } catch (err) {
+                console.error("خطأ في جلب لوحة الشرف من قاعدة البيانات:", err);
+            }
         }
 
         function startMainGame() {
@@ -528,11 +509,7 @@
             });
         }
 
-        function openContentModal(sectionKey) {
-            if (sectionKey === 'admin-section-modal' && !isAdminLoggedIn) {
-                alert('غير مسموح بالدخول، هذه لوحة خاصة بالأدمن فقط!');
-                return;
-            }
+        async function openContentModal(sectionKey) {
             activeModalSection = sectionKey;
             const modal = document.getElementById('contentModal');
             const titleEl = document.getElementById('modalTitle');
@@ -543,8 +520,11 @@
             else if (sectionKey === 'finance-section-modal') titleEl.innerText = 'المالية وحسابات الشركة';
             else if (sectionKey === 'upgrades-section-modal') titleEl.innerText = 'تطويرات الشركة';
             else if (sectionKey === 'missions-section-modal') titleEl.innerText = 'المهمات والإنجازات';
-            else if (sectionKey === 'top-players-section-modal') titleEl.innerText = 'لوحة شرف المديرين (التوب)';
-            else if (sectionKey === 'admin-section-modal') titleEl.innerText = 'لوحة تحكم الأدمن العامة 🛠️';
+            else if (sectionKey === 'top-players-section-modal') {
+                titleEl.innerText = 'لوحة شرف المديرين (التوب)';
+                // جلب البيانات المحدثة من MongoDB قبل عرض اللوحة
+                await fetchPlayersFromMongoDB();
+            }
 
             renderModalBody();
             modal.style.display = 'flex';
@@ -713,89 +693,24 @@
                 });
 
             } else if (activeModalSection === 'top-players-section-modal') {
-                container.innerHTML = `
-                    <div class="flex justify-between items-center mb-2">
-                        ${isAdminLoggedIn ? '<button type="button" id="openAdminFromTopBtn" class="bg-rose-600 text-white px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer">لوحة تحكم الأدمن 🛠️</button>' : ''}
-                        <p class="text-[10px] text-gray-400">🏆 لوحة شرف جميع اللاعبين (متزامن حياً):</p>
-                    </div>
-                `;
+                container.innerHTML = `<p class="text-[10px] text-gray-400 mb-2 text-right">🏆 لوحة شرف المديرين (من قاعدة بيانات MongoDB سحابياً):</p>`;
                 const playersList = document.createElement('div');
                 playersList.className = 'flex flex-col gap-2';
                 
-                // جلب أحدث بيانات مدعومة من التخزين المشترك
-                let latestPlayers = JSON.parse(localStorage.getItem('game_all_players') || JSON.stringify(allPlayersDB));
-                latestPlayers.sort((a, b) => b.balance - a.balance);
+                // ترتيب اللاعبين حسب الأرصدة من قاعدة البيانات
+                allPlayersDB.sort((a, b) => b.balance - a.balance);
 
-                latestPlayers.forEach((p, idx) => {
-                    const item = document.createElement('div');
-                    item.className = 'glass-panel p-2.5 rounded-xl flex items-center justify-between text-xs';
-                    item.innerHTML = `<span class="text-emerald-400 font-bold">${p.balance}ج</span><span class="font-bold text-white">${idx + 1}. ${p.name}</span>`;
-                    playersList.appendChild(item);
-                });
-                container.appendChild(playersList);
-
-                const adminBtn = document.getElementById('openAdminFromTopBtn');
-                if (adminBtn) {
-                    adminBtn.addEventListener('click', () => {
-                        openContentModal('admin-section-modal');
+                if(allPlayersDB.length === 0) {
+                    playersList.innerHTML = '<div class="text-center text-xs text-gray-400 py-4">جاري تحميل اللاعبين من السيرفر...</div>';
+                } else {
+                    allPlayersDB.forEach((p, idx) => {
+                        const item = document.createElement('div');
+                        item.className = 'glass-panel p-2.5 rounded-xl flex items-center justify-between text-xs';
+                        item.innerHTML = `<span class="text-emerald-400 font-bold">${p.balance}ج</span><span class="font-bold text-white">${idx + 1}. ${p.name}</span>`;
+                        playersList.appendChild(item);
                     });
                 }
-
-            } else if (activeModalSection === 'admin-section-modal') {
-                container.innerHTML = `
-                    <div class="flex flex-col gap-3">
-                        <div class="glass-panel p-3 rounded-xl border border-rose-500/30">
-                            <h4 class="text-xs font-bold text-rose-400 mb-2 text-right">➕ إضافة مهمة جديدة (تظهر لكل اللاعبين)</h4>
-                            <input type="text" id="adminMissionTitle" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-2 rounded-lg mb-2 outline-none text-right" placeholder="عنوان المهمة (مثال: أكمل 5 طلبات)">
-                            <div class="flex gap-2 mb-2">
-                                <input type="number" id="adminMissionTarget" class="w-1/2 bg-slate-900 border border-slate-700 text-white text-xs p-2 rounded-lg outline-none text-right" placeholder="الهدف (العدد)">
-                                <input type="number" id="adminMissionReward" class="w-1/2 bg-slate-900 border border-slate-700 text-white text-xs p-2 rounded-lg outline-none text-right" placeholder="الجائزة كاش (ج)">
-                            </div>
-                            <button type="button" id="adminAddMissionBtn" class="w-full bg-orange-500 text-slate-950 font-black py-2 rounded-lg text-xs cursor-pointer">نشر المهمة لكل اللاعبين</button>
-                        </div>
-
-                        <div class="glass-panel p-3 rounded-xl border border-orange-500/30">
-                            <h4 class="text-xs font-bold text-orange-400 mb-2 text-right">📢 إرسال إشعار عام لكل الحسابات</h4>
-                            <textarea id="adminBroadcastInput" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-2 rounded-lg mb-2 outline-none h-20 resize-none text-right" placeholder="اكتب نص الإشعار هنا..."></textarea>
-                            <button type="button" id="adminSendBroadcastBtn" class="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 font-black py-2 rounded-lg text-xs cursor-pointer">إرسال الإشعار الفوري 🚀</button>
-                        </div>
-                    </div>
-                `;
-
-                document.getElementById('adminAddMissionBtn').addEventListener('click', () => {
-                    const title = document.getElementById('adminMissionTitle').value.trim();
-                    const reward = parseInt(document.getElementById('adminMissionReward').value);
-                    const target = parseInt(document.getElementById('adminMissionTarget').value);
-                    if(title && reward && target) {
-                        const newMission = { id: Date.now(), title, rewardMoney: reward, rewardXp: 40, progress: 0, target, claimed: false };
-                        customMissions.push(newMission);
-                        localStorage.setItem('game_global_missions', JSON.stringify(customMissions));
-                        
-                        // بث المهمة لكل الأجهزة المفتوحة في نفس اللحظة
-                        gameChannel.postMessage({ type: 'NEW_MISSION', payload: customMissions });
-
-                        showNotification('تم نشر المهمة الجديدة بنجاح لكل اللاعبين!');
-                        document.getElementById('contentModal').style.display = 'none';
-                    } else {
-                        alert('برجاء ملء جميع بيانات المهمة بشكل صحيح.');
-                    }
-                });
-
-                document.getElementById('adminSendBroadcastBtn').addEventListener('click', () => {
-                    const text = document.getElementById('adminBroadcastInput').value.trim();
-                    if(text) {
-                        localStorage.setItem('game_active_broadcast', text);
-                        
-                        // بث الإشعار لكل الأجهزة المفتوحة في نفس اللحظة
-                        gameChannel.postMessage({ type: 'NEW_BROADCAST', payload: text });
-
-                        checkBroadcastNotification();
-                        showNotification('تم إرسال الإشعار لكل اللاعبين بنجاح!');
-                        document.getElementById('contentModal').style.display = 'none';
-                    } else {
-                        alert('برجاء كتابة نص الإشعار.');
-                    }
-                });
+                container.appendChild(playersList);
             }
         }
 
@@ -823,7 +738,7 @@
             document.getElementById('taxDueDisplay').innerText = taxDue + 'ج';
 
             const username = localStorage.getItem('game_username') || 'المدير';
-            registerPlayerToLeaderboard(username, balance, rating);
+            syncPlayerToMongoDB(username, balance, rating);
 
             const ordersContainer = document.getElementById('orders-container');
             ordersContainer.innerHTML = '';
