@@ -41,8 +41,8 @@
             50% { box-shadow: 0 0 35px rgba(249, 115, 22, 0.8); }
         }
         .pro-badge-glow { animation: pulseGlow 2.5s infinite; }
-        #adminPanelBtn { display: none; }
-        #adminPanelBtn.admin-visible { display: flex; }
+        #adminPanelBtn { display: none !important; }
+        #adminPanelBtn.admin-visible { display: flex !important; }
 
     </style>
 </head>
@@ -165,8 +165,7 @@
                 <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="upgrades-section-modal"><span>تطويرات الشركة</span><i class="fa-solid fa-arrow-up-right-dots text-purple-400 w-5 text-center"></i></button>
                 <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="missions-section-modal"><span>المهمات والإنجازات</span><i class="fa-solid fa-bullseye text-rose-400 w-5 text-center"></i></button>
                 <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="top-players-section-modal"><span>لوحة الشرف (التوب)</span><i class="fa-solid fa-trophy text-amber-300 w-5 text-center"></i></button>
-                <button id="adminPanelBtn" type="button" class="admin-visible flex items-center justify-end gap-3 p-3 rounded-xl bg-gradient-to-r from-red-600/30 to-orange-500/20 border border-red-500/40 text-xs font-black text-white cursor-pointer" data-target="admin-panel-section-modal"><span>لوحة تحكم الأدمن</span><i class="fa-solid fa-user-shield text-red-400 w-5 text-center"></i></button>
-                <button type="button" id="adminPanelBtn" class="flex items-center justify-end gap-3 p-3 rounded-xl bg-rose-950/60 border border-rose-500/30 text-xs font-bold text-rose-300 cursor-pointer" style="display:none;"><span>لوحة تحكم الأدمن</span><i class="fa-solid fa-user-shield w-5 text-center"></i></button>
+                <button id="adminPanelBtn" type="button" class="flex items-center justify-end gap-3 p-3 rounded-xl bg-gradient-to-r from-red-600/30 to-orange-500/20 border border-red-500/40 text-xs font-black text-white cursor-pointer" data-target="admin-panel-section-modal" style="display:none !important;"><span>لوحة تحكم الأدمن</span><i class="fa-solid fa-user-shield text-red-400 w-5 text-center"></i></button>
             </div>
         </div>
 
@@ -293,6 +292,7 @@
                 document.getElementById('userDisplayName').innerText = savedUser;
                 if(savedUser.toLowerCase() === 'admin') isAdminLoggedIn = true;
             }
+            updateAdminVisibility();
             initSocket();
         });
 
@@ -380,7 +380,7 @@
             });
 
             const adminPanelBtn = document.getElementById('adminPanelBtn');
-            if (isAdminLoggedIn && adminPanelBtn) adminPanelBtn.style.display = 'flex';
+            updateAdminVisibility();
             adminPanelBtn?.addEventListener('click', async () => { closeSidebar(); document.getElementById('adminModal').style.display = 'flex'; await openAdminPanel(); });
             document.getElementById('closeAdminModalBtn')?.addEventListener('click', () => document.getElementById('adminModal').style.display = 'none');
             document.querySelectorAll('.admin-money-btn').forEach(btn => btn.addEventListener('click', () => adminGiveMoney(Number(btn.dataset.amount))));
@@ -1144,7 +1144,10 @@
 
         function updateAdminVisibility() {
             const btn = document.getElementById('adminPanelBtn');
-            if (btn) btn.classList.toggle('admin-visible', isAdminLoggedIn);
+            if (btn) {
+                btn.classList.toggle('admin-visible', isAdminLoggedIn);
+                btn.style.setProperty('display', isAdminLoggedIn ? 'flex' : 'none', 'important');
+            }
         }
 
         function showNotification(msg) {
