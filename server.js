@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 3000;
 // مهم:
 // لا تضع رابط MongoDB الحقيقي داخل GitHub.
 // استخدم Environment Variable باسم MONGODB_URI
-const const MONGODB_URI = "mongodb+srv://bodacpm:112003Ab@cluster3.oqbrc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster3";
+const MONGODB_URI = "mongodb+srv://bodacpm:112003Ab@cluster3.oqbrc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster3";
 
 let client;
 let db;
