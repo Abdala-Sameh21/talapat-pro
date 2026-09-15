@@ -7,6 +7,7 @@
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts (Cairo) -->
@@ -161,6 +162,33 @@
                 <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="upgrades-section-modal"><span>تطويرات الشركة</span><i class="fa-solid fa-arrow-up-right-dots text-purple-400 w-5 text-center"></i></button>
                 <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="missions-section-modal"><span>المهمات والإنجازات</span><i class="fa-solid fa-bullseye text-rose-400 w-5 text-center"></i></button>
                 <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="top-players-section-modal"><span>لوحة الشرف (التوب)</span><i class="fa-solid fa-trophy text-amber-300 w-5 text-center"></i></button>
+                <button type="button" id="adminPanelBtn" class="flex items-center justify-end gap-3 p-3 rounded-xl bg-rose-950/60 border border-rose-500/30 text-xs font-bold text-rose-300 cursor-pointer" style="display:none;"><span>لوحة تحكم الأدمن</span><i class="fa-solid fa-user-shield w-5 text-center"></i></button>
+            </div>
+        </div>
+
+        <!-- لوحة الأدمن -->
+        <div id="adminModal" class="fixed inset-0 bg-slate-950/90 z-[10000] flex items-center justify-center p-4" style="display:none;">
+            <div class="glass-panel rounded-2xl p-4 w-full max-w-sm max-h-[90vh] overflow-y-auto border border-rose-500/40 text-right">
+                <div class="flex justify-between items-center mb-3 border-b border-slate-800 pb-2"><button id="closeAdminModalBtn" type="button" class="text-gray-400 cursor-pointer"><i class="fa-solid fa-xmark"></i></button><h3 class="text-rose-400 font-black text-sm">🛠️ لوحة تحكم الأدمن</h3></div>
+                <label class="text-[10px] text-gray-400">اختيار اللاعب</label>
+                <select id="adminPlayerSelect" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-2 text-xs mt-1 mb-3"></select>
+                <div class="grid grid-cols-3 gap-1.5 mb-3">
+                    <button class="admin-money-btn bg-emerald-600 text-white rounded-lg py-2 text-[10px] font-bold" data-amount="100">+100</button>
+                    <button class="admin-money-btn bg-emerald-600 text-white rounded-lg py-2 text-[10px] font-bold" data-amount="500">+500</button>
+                    <button class="admin-money-btn bg-emerald-600 text-white rounded-lg py-2 text-[10px] font-bold" data-amount="1000">+1000</button>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <div><input id="adminBalanceInput" type="number" min="0" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs" placeholder="الرصيد"><button id="adminSetBalanceBtn" class="w-full mt-1 bg-amber-500 text-slate-950 rounded-lg py-1.5 text-[10px] font-bold">تحديد الرصيد</button></div>
+                    <div><input id="adminLevelInput" type="number" min="1" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs" placeholder="المستوى"><button id="adminSetLevelBtn" class="w-full mt-1 bg-purple-500 text-white rounded-lg py-1.5 text-[10px] font-bold">تحديد المستوى</button></div>
+                </div>
+                <textarea id="adminBroadcastInput" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs mb-1" rows="3" placeholder="رسالة عامة للاعبين"></textarea>
+                <button id="adminBroadcastBtn" class="w-full bg-orange-500 text-slate-950 rounded-xl py-2 text-[10px] font-black mb-4">إرسال رسالة عامة 📢</button>
+                <div class="border-t border-slate-800 pt-3"><h4 class="text-cyan-400 text-xs font-black mb-2">إدارة المهام</h4>
+                    <input id="adminMissionTitle" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs mb-1" placeholder="عنوان المهمة">
+                    <div class="grid grid-cols-3 gap-1.5 mb-1"><input id="adminMissionMoney" type="number" min="0" class="bg-slate-900 border border-slate-700 rounded-lg p-2 text-[10px]" placeholder="جنيه"><input id="adminMissionXp" type="number" min="0" class="bg-slate-900 border border-slate-700 rounded-lg p-2 text-[10px]" placeholder="XP"><input id="adminMissionTarget" type="number" min="1" class="bg-slate-900 border border-slate-700 rounded-lg p-2 text-[10px]" placeholder="الهدف"></div>
+                    <button id="adminCreateMissionBtn" class="w-full bg-cyan-600 text-white rounded-xl py-2 text-[10px] font-bold mb-2">إنشاء مهمة</button>
+                    <div id="adminMissionsList" class="flex flex-col gap-1.5"></div>
+                </div>
             </div>
         </div>
 
@@ -216,14 +244,18 @@
         let officeLevel = 1;
         let hasBoxUpgrade = false;
         let isAdminLoggedIn = false;
+        let playerId = localStorage.getItem('game_player_id') || crypto.randomUUID();
+        localStorage.setItem('game_player_id', playerId);
+        let socket = null;
+        let isGameDataLoaded = false;
+        let isApplyingRemoteUpdate = false;
+        let saveTimer = null;
+        let lastServerUpdatedAt = null;
+        let missionsLoadedFromServer = false;
 
         let allPlayersDB = [];
 
-        let customMissions = [
-            { id: 1, title: "إتمام أول 3 طلبات توصيل بنجاح", rewardMoney: 100, rewardXp: 30, progress: 0, target: 3, claimed: false },
-            { id: 2, title: "التعاقد مع أول مطعم شراكة حي", rewardMoney: 150, rewardXp: 50, progress: 0, target: 1, claimed: false },
-            { id: 3, title: "سداد أول ضريبة مستحقة للشركة", rewardMoney: 150, rewardXp: 40, progress: 0, target: 1, claimed: false }
-        ];
+        let customMissions = [];
 
         let selectedOrderIndex = null;
         let map = null;
@@ -254,8 +286,8 @@
             if (savedUser) {
                 document.getElementById('userDisplayName').innerText = savedUser;
                 if(savedUser.toLowerCase() === 'admin') isAdminLoggedIn = true;
-                syncPlayerToMongoDB(savedUser, balance, rating);
             }
+            initSocket();
         });
 
         function initEventListeners() {
@@ -264,7 +296,7 @@
                 const savedUser = localStorage.getItem('game_username');
                 if (savedUser) {
                     document.getElementById('userDisplayName').innerText = savedUser;
-                    startMainGame();
+                    loadPlayerFromServer(savedUser).then(() => startMainGame());
                 } else {
                     document.getElementById('loginScreen').style.display = 'flex';
                 }
@@ -280,8 +312,7 @@
                             localStorage.setItem('game_username', input);
                             document.getElementById('userDisplayName').innerText = input;
                             document.getElementById('loginScreen').style.display = 'none';
-                            syncPlayerToMongoDB(input, balance, rating);
-                            startMainGame();
+                            loadPlayerFromServer(input).then(() => startMainGame());
                             showNotification('تم تسجيل دخول الأدمن بنجاح 🛠️');
                         } else {
                             alert('كلمة المرور غير صحيحة!');
@@ -291,8 +322,7 @@
                         localStorage.setItem('game_username', input);
                         document.getElementById('userDisplayName').innerText = input;
                         document.getElementById('loginScreen').style.display = 'none';
-                        syncPlayerToMongoDB(input, balance, rating);
-                        startMainGame();
+                        loadPlayerFromServer(input).then(() => startMainGame());
                     }
                 } else {
                     alert('الرجاء إدخال اسم المدير العام!');
@@ -337,27 +367,184 @@
             });
 
             document.getElementById('headerBroadcastBtn').addEventListener('click', () => {
-                alert("لا توجد إشعارات جديدة حالياً.");
+                fetch('/api/broadcast').then(r => r.json()).then(d => { if (d.text) showBroadcast(d.text); else alert('لا توجد إشعارات جديدة حالياً.'); }).catch(() => alert('تعذر جلب الإشعار.'));
             });
+
+            const adminPanelBtn = document.getElementById('adminPanelBtn');
+            if (isAdminLoggedIn && adminPanelBtn) adminPanelBtn.style.display = 'flex';
+            adminPanelBtn?.addEventListener('click', async () => { closeSidebar(); document.getElementById('adminModal').style.display = 'flex'; await openAdminPanel(); });
+            document.getElementById('closeAdminModalBtn')?.addEventListener('click', () => document.getElementById('adminModal').style.display = 'none');
+            document.querySelectorAll('.admin-money-btn').forEach(btn => btn.addEventListener('click', () => adminGiveMoney(Number(btn.dataset.amount))));
+            document.getElementById('adminSetBalanceBtn')?.addEventListener('click', adminSetBalance);
+            document.getElementById('adminSetLevelBtn')?.addEventListener('click', adminSetLevel);
+            document.getElementById('adminBroadcastBtn')?.addEventListener('click', adminBroadcast);
+            document.getElementById('adminCreateMissionBtn')?.addEventListener('click', adminCreateMission);
 
             setInterval(() => { generateOrder(); }, 5000);
         }
 
-        // دالة إرسال البيانات وحفظها في MongoDB عبر API السيرفر
-        async function syncPlayerToMongoDB(name, curBalance, curRating) {
+        // ===============================
+        // PLAYER PERSISTENCE + SOCKET.IO
+        // ===============================
+        function getPlayerPayload() {
+            return {
+                playerId,
+                name: localStorage.getItem('game_username') || 'المدير',
+                balance,
+                totalRevenue,
+                taxDue,
+                rating,
+                level,
+                xp,
+                maxXp,
+                maxFleetSize,
+                officeLevel,
+                hasBoxUpgrade,
+                riders,
+                missionsProgress: customMissions.reduce((acc, m) => {
+                    acc[String(m.id)] = { progress: m.progress || 0, claimed: !!m.claimed };
+                    return acc;
+                }, {})
+            };
+        }
+
+        function schedulePlayerSave() {
+            if (!isGameDataLoaded || isApplyingRemoteUpdate) return;
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(savePlayerToMongoDB, 650);
+        }
+
+        async function savePlayerToMongoDB() {
+            if (!isGameDataLoaded) return;
             try {
-                await fetch('/api/players', {
+                const response = await fetch('/api/players', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name: name,
-                        balance: curBalance,
-                        rating: curRating
-                    })
+                    body: JSON.stringify(getPlayerPayload())
                 });
+                if (!response.ok) throw new Error('Save failed: ' + response.status);
+                const data = await response.json();
+                if (data.player?.updatedAt) lastServerUpdatedAt = data.player.updatedAt;
             } catch (err) {
-                console.error("خطأ في مزامنة بيانات اللاعب مع السيرفر:", err);
+                console.error('خطأ في حفظ بيانات اللاعب:', err);
             }
+        }
+
+        function applyPlayerData(data) {
+            if (!data) return;
+            isApplyingRemoteUpdate = true;
+            clearTimeout(saveTimer);
+            balance = Number(data.balance ?? 500);
+            totalRevenue = Number(data.totalRevenue ?? 0);
+            taxDue = Number(data.taxDue ?? 0);
+            rating = Number(data.rating ?? 4.8);
+            level = Number(data.level ?? 1);
+            xp = Number(data.xp ?? 0);
+            maxXp = Number(data.maxXp ?? 100);
+            maxFleetSize = Number(data.maxFleetSize ?? 3);
+            officeLevel = Number(data.officeLevel ?? 1);
+            hasBoxUpgrade = Boolean(data.hasBoxUpgrade);
+            riders = Array.isArray(data.riders) && data.riders.length ? data.riders : riders;
+            const progress = data.missionsProgress || {};
+            customMissions.forEach(m => {
+                const saved = progress[String(m.id)];
+                if (saved) {
+                    m.progress = Number(saved.progress ?? 0);
+                    m.claimed = Boolean(saved.claimed);
+                }
+            });
+            if (data.name) {
+                localStorage.setItem('game_username', data.name);
+                document.getElementById('userDisplayName').innerText = data.name;
+            }
+            lastServerUpdatedAt = data.updatedAt || null;
+            updateUI();
+            isApplyingRemoteUpdate = false;
+        }
+
+        async function loadMissionsFromServer() {
+            try {
+                const response = await fetch('/api/missions');
+                if (!response.ok) throw new Error('Missions request failed');
+                const missions = await response.json();
+                if (Array.isArray(missions)) {
+                    customMissions = missions.map(m => ({
+                        id: m.id, title: m.title, rewardMoney: Number(m.rewardMoney || 0),
+                        rewardXp: Number(m.rewardXp || 0), progress: 0, target: Math.max(1, Number(m.target || 1)), claimed: false
+                    }));
+                    missionsLoadedFromServer = true;
+                }
+            } catch (err) {
+                console.error('خطأ في تحميل المهام:', err);
+            }
+        }
+
+        async function loadPlayerFromServer(name) {
+            try {
+                await loadMissionsFromServer();
+                const response = await fetch('/api/players/id/' + encodeURIComponent(playerId));
+                if (response.ok) {
+                    const data = await response.json();
+                    applyPlayerData(data);
+                } else if (response.status === 404) {
+                    isGameDataLoaded = true;
+                    await savePlayerToMongoDB();
+                } else {
+                    throw new Error('Player load failed: ' + response.status);
+                }
+            } catch (err) {
+                console.error('تعذر تحميل بيانات اللاعب من السيرفر:', err);
+                showNotification('تعذر تحميل الحفظ السحابي، سيتم المحاولة مرة أخرى.');
+                isGameDataLoaded = true;
+            }
+            isGameDataLoaded = true;
+            updateUI();
+        }
+
+        function initSocket() {
+            if (typeof io !== 'function') {
+                console.warn('Socket.io client غير متاح');
+                return;
+            }
+            socket = io();
+            socket.on('connect', () => {
+                socket.emit('player:identify', { playerId });
+            });
+            socket.on('player:update', (data) => {
+                if (data?.playerId !== playerId) return;
+                applyPlayerData(data);
+                showNotification('🔄 تم تحديث بيانات حسابك من الإدارة.');
+            });
+            socket.on('leaderboard:update', (players) => {
+                if (Array.isArray(players)) allPlayersDB = players;
+            });
+            socket.on('missions:init', (missions) => {
+                if (!missionsLoadedFromServer && Array.isArray(missions)) {
+                    customMissions = missions.map(m => ({ id: m.id, title: m.title, rewardMoney: Number(m.rewardMoney || 0), rewardXp: Number(m.rewardXp || 0), progress: 0, target: Math.max(1, Number(m.target || 1)), claimed: false }));
+                }
+            });
+            socket.on('mission:new', (mission) => {
+                if (!customMissions.some(m => String(m.id) === String(mission.id))) {
+                    customMissions.unshift({ ...mission, progress: 0, claimed: false });
+                    if (activeModalSection === 'missions-section-modal') renderModalBody();
+                }
+            });
+            socket.on('mission:delete', (missionId) => {
+                customMissions = customMissions.filter(m => String(m.id) !== String(missionId));
+                if (activeModalSection === 'missions-section-modal') renderModalBody();
+            });
+            socket.on('broadcast:new', showBroadcast);
+            socket.on('broadcast:clear', () => {
+                document.getElementById('globalBroadcastBanner').style.display = 'none';
+                document.getElementById('broadcastDot').style.display = 'none';
+            });
+        }
+
+        function showBroadcast(text) {
+            if (!text) return;
+            document.getElementById('broadcastText').innerText = text;
+            document.getElementById('globalBroadcastBanner').style.display = 'flex';
+            document.getElementById('broadcastDot').style.display = 'block';
         }
 
         // دالة جلب قائمة كل اللاعبين من MongoDB لتعرضها في لوحة الشرف
@@ -374,6 +561,7 @@
         }
 
         function startMainGame() {
+            fetch('/api/broadcast').then(r => r.json()).then(d => { if (d.text) showBroadcast(d.text); }).catch(() => {});
             logMsg(`🚀 جاري رصد إحداثيات GPS وسحب المحلات والشوارع المحيطة...`);
             
             let gpsResolved = false;
@@ -714,6 +902,52 @@
             }
         }
 
+        async function refreshAdminPlayers() {
+            await fetchPlayersFromMongoDB();
+            const select = document.getElementById('adminPlayerSelect');
+            if (!select) return;
+            select.innerHTML = allPlayersDB.map(p => `<option value="${p.playerId}">${p.name} — ${p.balance}ج — Lv.${p.level}</option>`).join('');
+        }
+
+        async function openAdminPanel() {
+            await refreshAdminPlayers();
+            renderAdminMissions();
+        }
+
+        function selectedAdminPlayerId() { return document.getElementById('adminPlayerSelect')?.value || ''; }
+
+        async function adminPost(url, body) {
+            const response = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+            const data = await response.json();
+            if (!response.ok || !data.success) throw new Error(data.error || 'Admin request failed');
+            return data;
+        }
+
+        async function adminGiveMoney(amount) {
+            try { await adminPost('/api/admin/give-money', { playerId:selectedAdminPlayerId(), amount }); showNotification('تمت إضافة الأموال بنجاح.'); await refreshAdminPlayers(); } catch(e) { alert(e.message); }
+        }
+        async function adminSetBalance() {
+            try { await adminPost('/api/admin/set-balance', { playerId:selectedAdminPlayerId(), balance:Number(document.getElementById('adminBalanceInput').value) }); showNotification('تم تحديد الرصيد.'); await refreshAdminPlayers(); } catch(e) { alert(e.message); }
+        }
+        async function adminSetLevel() {
+            try { await adminPost('/api/admin/set-level', { playerId:selectedAdminPlayerId(), level:Number(document.getElementById('adminLevelInput').value) }); showNotification('تم تحديد المستوى.'); await refreshAdminPlayers(); } catch(e) { alert(e.message); }
+        }
+        async function adminBroadcast() {
+            const text = document.getElementById('adminBroadcastInput').value.trim();
+            if (!text) return;
+            try { await adminPost('/api/broadcast', { text }); document.getElementById('adminBroadcastInput').value=''; showNotification('تم إرسال الرسالة لجميع اللاعبين.'); } catch(e) { alert(e.message); }
+        }
+        async function adminCreateMission() {
+            const title=document.getElementById('adminMissionTitle').value.trim();
+            if(!title) return alert('اكتب عنوان المهمة.');
+            try { await adminPost('/api/missions', { id:Date.now(), title, rewardMoney:Number(document.getElementById('adminMissionMoney').value||0), rewardXp:Number(document.getElementById('adminMissionXp').value||0), target:Number(document.getElementById('adminMissionTarget').value||1) }); document.getElementById('adminMissionTitle').value=''; renderAdminMissions(); showNotification('تم إنشاء المهمة.'); } catch(e) { alert(e.message); }
+        }
+        function renderAdminMissions() {
+            const box=document.getElementById('adminMissionsList'); if(!box) return;
+            box.innerHTML=customMissions.map(m=>`<div class="bg-slate-900 rounded-lg p-2 flex justify-between items-center"><button class="admin-delete-mission bg-rose-600 text-white px-2 py-1 rounded text-[9px]" data-id="${m.id}">حذف</button><span class="text-[9px] text-gray-300">${m.title} — ${m.rewardMoney}ج / ${m.target}</span></div>`).join('');
+            box.querySelectorAll('.admin-delete-mission').forEach(btn=>btn.addEventListener('click',async()=>{ try { const r=await fetch('/api/missions/'+encodeURIComponent(btn.dataset.id),{method:'DELETE'}); if(!r.ok) throw new Error('تعذر حذف المهمة'); showNotification('تم حذف المهمة.'); } catch(e){alert(e.message);} }));
+        }
+
         function showNotification(msg) {
             const toast = document.getElementById('toast');
             toast.innerText = msg;
@@ -737,8 +971,7 @@
             document.getElementById('mgrLevel').innerText = level;
             document.getElementById('taxDueDisplay').innerText = taxDue + 'ج';
 
-            const username = localStorage.getItem('game_username') || 'المدير';
-            syncPlayerToMongoDB(username, balance, rating);
+            schedulePlayerSave();
 
             const ordersContainer = document.getElementById('orders-container');
             ordersContainer.innerHTML = '';
