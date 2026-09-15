@@ -41,6 +41,9 @@
             50% { box-shadow: 0 0 35px rgba(249, 115, 22, 0.8); }
         }
         .pro-badge-glow { animation: pulseGlow 2.5s infinite; }
+        #adminPanelBtn { display: none; }
+        #adminPanelBtn.admin-visible { display: flex; }
+
     </style>
 </head>
 <body>
@@ -162,6 +165,7 @@
                 <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="upgrades-section-modal"><span>تطويرات الشركة</span><i class="fa-solid fa-arrow-up-right-dots text-purple-400 w-5 text-center"></i></button>
                 <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="missions-section-modal"><span>المهمات والإنجازات</span><i class="fa-solid fa-bullseye text-rose-400 w-5 text-center"></i></button>
                 <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="top-players-section-modal"><span>لوحة الشرف (التوب)</span><i class="fa-solid fa-trophy text-amber-300 w-5 text-center"></i></button>
+                <button id="adminPanelBtn" type="button" class="admin-visible flex items-center justify-end gap-3 p-3 rounded-xl bg-gradient-to-r from-red-600/30 to-orange-500/20 border border-red-500/40 text-xs font-black text-white cursor-pointer" data-target="admin-panel-section-modal"><span>لوحة تحكم الأدمن</span><i class="fa-solid fa-user-shield text-red-400 w-5 text-center"></i></button>
                 <button type="button" id="adminPanelBtn" class="flex items-center justify-end gap-3 p-3 rounded-xl bg-rose-950/60 border border-rose-500/30 text-xs font-bold text-rose-300 cursor-pointer" style="display:none;"><span>لوحة تحكم الأدمن</span><i class="fa-solid fa-user-shield w-5 text-center"></i></button>
             </div>
         </div>
@@ -282,6 +286,7 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             initEventListeners();
+            loadMissionsFromServer();
             const savedUser = localStorage.getItem('game_username');
             if (savedUser) {
                 document.getElementById('userDisplayName').innerText = savedUser;
@@ -310,6 +315,7 @@
                         if (pass === '1234') {
                             isAdminLoggedIn = true;
                             localStorage.setItem('game_username', input);
+                            updateAdminVisibility();
                             document.getElementById('userDisplayName').innerText = input;
                             document.getElementById('loginScreen').style.display = 'none';
                             loadPlayerFromServer(input).then(() => startMainGame());
@@ -320,6 +326,8 @@
                         }
                     } else {
                         localStorage.setItem('game_username', input);
+                        isAdminLoggedIn = false;
+                        updateAdminVisibility();
                         document.getElementById('userDisplayName').innerText = input;
                         document.getElementById('loginScreen').style.display = 'none';
                         loadPlayerFromServer(input).then(() => startMainGame());
@@ -713,6 +721,14 @@
                 // جلب البيانات المحدثة من MongoDB قبل عرض اللوحة
                 await fetchPlayersFromMongoDB();
             }
+            else if (sectionKey === 'admin-panel-section-modal') {
+                if (!isAdminLoggedIn) {
+                    showNotification('هذه اللوحة متاحة للأدمن فقط 🔒');
+                    return;
+                }
+                titleEl.innerText = 'لوحة تحكم الأدمن 🛠️';
+                await fetchPlayersFromMongoDB();
+            }
 
             renderModalBody();
             modal.style.display = 'flex';
@@ -880,6 +896,136 @@
                     btn.addEventListener('click', (e) => { claimMissionReward(parseInt(e.currentTarget.dataset.index)); renderModalBody(); });
                 });
 
+            } else if (activeModalSection === 'admin-panel-section-modal') {
+                if (!isAdminLoggedIn) {
+                    container.innerHTML = '<div class="text-center text-xs text-rose-400 py-6">غير مصرح لك بالدخول.</div>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <div class="glass-panel p-3 rounded-xl border border-red-500/30">
+                        <div class="text-[10px] text-gray-400 mb-2">اختر لاعبًا للتحكم في بياناته مباشرة من MongoDB:</div>
+                        <select id="adminPlayerSelect" class="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2 text-[11px] outline-none">
+                            <option value="">-- اختر اللاعب --</option>
+                            ${allPlayersDB.map(p => `<option value="${String(p.playerId).replace(/"/g, '&quot;')}">${String(p.name || p.playerId).replace(/</g, '&lt;')} — ${Number(p.balance || 0)}ج</option>`).join('')}
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button" class="admin-money-btn bg-emerald-600 text-white py-2 rounded-xl text-[10px] font-black cursor-pointer" data-amount="100">+100ج</button>
+                        <button type="button" class="admin-money-btn bg-emerald-600 text-white py-2 rounded-xl text-[10px] font-black cursor-pointer" data-amount="500">+500ج</button>
+                        <button type="button" class="admin-money-btn bg-emerald-600 text-white py-2 rounded-xl text-[10px] font-black cursor-pointer" data-amount="1000">+1000ج</button>
+                    </div>
+
+                    <div class="glass-panel p-3 rounded-xl flex flex-col gap-2">
+                        <div class="flex gap-2">
+                            <input id="adminBalanceInput" type="number" min="0" class="flex-1 bg-slate-950 border border-slate-700 text-white rounded-xl px-2 py-2 text-[10px] outline-none" placeholder="الرصيد الجديد">
+                            <button id="adminSetBalanceBtn" type="button" class="bg-orange-500 text-slate-950 px-3 rounded-xl text-[10px] font-black cursor-pointer">تحديد الرصيد</button>
+                        </div>
+                        <div class="flex gap-2">
+                            <input id="adminLevelInput" type="number" min="1" class="flex-1 bg-slate-950 border border-slate-700 text-white rounded-xl px-2 py-2 text-[10px] outline-none" placeholder="المستوى الجديد">
+                            <button id="adminSetLevelBtn" type="button" class="bg-purple-600 text-white px-3 rounded-xl text-[10px] font-black cursor-pointer">تحديد المستوى</button>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel p-3 rounded-xl flex flex-col gap-2">
+                        <div class="text-[10px] text-gray-400">Broadcast للاعبين:</div>
+                        <textarea id="adminBroadcastInput" rows="2" class="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-2 py-2 text-[10px] outline-none resize-none" placeholder="اكتب رسالة عامة..."></textarea>
+                        <button id="adminBroadcastBtn" type="button" class="w-full bg-cyan-600 text-white py-2 rounded-xl text-[10px] font-black cursor-pointer">إرسال الرسالة 📢</button>
+                    </div>
+
+                    <div class="glass-panel p-3 rounded-xl flex flex-col gap-2">
+                        <div class="text-[10px] text-gray-400">إنشاء مهمة جديدة:</div>
+                        <input id="adminMissionTitle" class="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-2 py-2 text-[10px] outline-none" placeholder="اسم المهمة">
+                        <div class="grid grid-cols-3 gap-2">
+                            <input id="adminMissionMoney" type="number" min="0" class="bg-slate-950 border border-slate-700 text-white rounded-xl px-2 py-2 text-[10px] outline-none" placeholder="جائزة المال">
+                            <input id="adminMissionXp" type="number" min="0" class="bg-slate-950 border border-slate-700 text-white rounded-xl px-2 py-2 text-[10px] outline-none" placeholder="XP">
+                            <input id="adminMissionTarget" type="number" min="1" class="bg-slate-950 border border-slate-700 text-white rounded-xl px-2 py-2 text-[10px] outline-none" placeholder="الهدف">
+                        </div>
+                        <button id="adminCreateMissionBtn" type="button" class="w-full bg-rose-600 text-white py-2 rounded-xl text-[10px] font-black cursor-pointer">إنشاء المهمة 🎯</button>
+                    </div>
+
+                    <div id="adminMissionList" class="flex flex-col gap-2"></div>
+                `;
+
+                const select = document.getElementById('adminPlayerSelect');
+                const requirePlayer = () => {
+                    if (!select || !select.value) {
+                        showNotification('اختر لاعبًا أولاً ⚠️');
+                        return false;
+                    }
+                    return true;
+                };
+
+                container.querySelectorAll('.admin-money-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        if (!requirePlayer()) return;
+                        const amount = Number(btn.dataset.amount);
+                        try {
+                            const r = await fetch('/api/admin/give-money', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({playerId: select.value, amount}) });
+                            const data = await r.json();
+                            if (!r.ok || !data.success) throw new Error(data.error || 'تعذر تنفيذ العملية');
+                            showNotification(`تمت إضافة ${amount}ج للاعب ✅`);
+                            await fetchPlayersFromMongoDB();
+                            renderModalBody();
+                        } catch (err) { showNotification(err.message || 'حدث خطأ'); }
+                    });
+                });
+
+                document.getElementById('adminSetBalanceBtn').addEventListener('click', async () => {
+                    if (!requirePlayer()) return;
+                    const balanceValue = Math.max(0, Number(document.getElementById('adminBalanceInput').value));
+                    if (!Number.isFinite(balanceValue)) return showNotification('أدخل رصيدًا صحيحًا');
+                    try {
+                        const r = await fetch('/api/admin/set-balance', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({playerId: select.value, balance: balanceValue}) });
+                        const data = await r.json();
+                        if (!r.ok || !data.success) throw new Error(data.error || 'تعذر تحديد الرصيد');
+                        showNotification('تم تحديد الرصيد ✅'); await fetchPlayersFromMongoDB(); renderModalBody();
+                    } catch (err) { showNotification(err.message || 'حدث خطأ'); }
+                });
+
+                document.getElementById('adminSetLevelBtn').addEventListener('click', async () => {
+                    if (!requirePlayer()) return;
+                    const levelValue = Math.max(1, Number(document.getElementById('adminLevelInput').value));
+                    if (!Number.isFinite(levelValue)) return showNotification('أدخل مستوى صحيحًا');
+                    try {
+                        const r = await fetch('/api/admin/set-level', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({playerId: select.value, level: levelValue}) });
+                        const data = await r.json();
+                        if (!r.ok || !data.success) throw new Error(data.error || 'تعذر تحديد المستوى');
+                        showNotification('تم تحديد المستوى ✅'); await fetchPlayersFromMongoDB(); renderModalBody();
+                    } catch (err) { showNotification(err.message || 'حدث خطأ'); }
+                });
+
+                document.getElementById('adminBroadcastBtn').addEventListener('click', async () => {
+                    const text = document.getElementById('adminBroadcastInput').value.trim();
+                    if (!text) return showNotification('اكتب الرسالة أولاً');
+                    try {
+                        const r = await fetch('/api/broadcast', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({text}) });
+                        const data = await r.json();
+                        if (!r.ok || !data.success) throw new Error(data.error || 'تعذر إرسال الرسالة');
+                        document.getElementById('adminBroadcastInput').value = '';
+                        showNotification('تم إرسال الرسالة لكل اللاعبين 📢');
+                    } catch (err) { showNotification(err.message || 'حدث خطأ'); }
+                });
+
+                document.getElementById('adminCreateMissionBtn').addEventListener('click', async () => {
+                    const title = document.getElementById('adminMissionTitle').value.trim();
+                    const rewardMoney = Math.max(0, Number(document.getElementById('adminMissionMoney').value || 0));
+                    const rewardXp = Math.max(0, Number(document.getElementById('adminMissionXp').value || 0));
+                    const target = Math.max(1, Number(document.getElementById('adminMissionTarget').value || 1));
+                    if (!title) return showNotification('اكتب اسم المهمة أولاً');
+                    try {
+                        const r = await fetch('/api/missions', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({title, rewardMoney, rewardXp, target}) });
+                        const data = await r.json();
+                        if (!r.ok || !data.success) throw new Error(data.error || 'تعذر إنشاء المهمة');
+                        showNotification('تم إنشاء المهمة 🎯');
+                        await loadMissionsFromServer();
+                        renderModalBody();
+                    } catch (err) { showNotification(err.message || 'حدث خطأ'); }
+                });
+
+                renderAdminMissionList();
+
             } else if (activeModalSection === 'top-players-section-modal') {
                 container.innerHTML = `<p class="text-[10px] text-gray-400 mb-2 text-right">🏆 لوحة شرف المديرين (من قاعدة بيانات MongoDB سحابياً):</p>`;
                 const playersList = document.createElement('div');
@@ -946,6 +1092,53 @@
             const box=document.getElementById('adminMissionsList'); if(!box) return;
             box.innerHTML=customMissions.map(m=>`<div class="bg-slate-900 rounded-lg p-2 flex justify-between items-center"><button class="admin-delete-mission bg-rose-600 text-white px-2 py-1 rounded text-[9px]" data-id="${m.id}">حذف</button><span class="text-[9px] text-gray-300">${m.title} — ${m.rewardMoney}ج / ${m.target}</span></div>`).join('');
             box.querySelectorAll('.admin-delete-mission').forEach(btn=>btn.addEventListener('click',async()=>{ try { const r=await fetch('/api/missions/'+encodeURIComponent(btn.dataset.id),{method:'DELETE'}); if(!r.ok) throw new Error('تعذر حذف المهمة'); showNotification('تم حذف المهمة.'); } catch(e){alert(e.message);} }));
+        }
+
+        async function loadMissionsFromServer() {
+            try {
+                const response = await fetch('/api/missions');
+                const data = await response.json();
+                if (Array.isArray(data) && data.length) {
+                    customMissions = data.map(m => ({...m, progress: 0, claimed: false}));
+                }
+            } catch (err) {
+                console.error('خطأ في تحميل المهام:', err);
+            }
+        }
+
+        async function renderAdminMissionList() {
+            const box = document.getElementById('adminMissionList');
+            if (!box) return;
+            try {
+                const response = await fetch('/api/missions');
+                const missions = await response.json();
+                box.innerHTML = '<div class="text-[10px] text-gray-400">المهام المحفوظة:</div>';
+                if (!Array.isArray(missions) || missions.length === 0) {
+                    box.innerHTML += '<div class="text-center text-[10px] text-gray-500 py-2">لا توجد مهام.</div>';
+                    return;
+                }
+                missions.forEach(m => {
+                    const row = document.createElement('div');
+                    row.className = 'bg-slate-900 border border-slate-800 p-2 rounded-xl flex items-center justify-between gap-2';
+                    row.innerHTML = `<button type="button" class="admin-delete-mission bg-rose-600/80 text-white px-2 py-1 rounded-lg text-[9px] font-bold" data-id="${m.id}">حذف</button><div class="text-right"><div class="text-[10px] text-white font-bold">${m.title}</div><div class="text-[9px] text-gray-400">${m.rewardMoney}ج + ${m.rewardXp} XP | الهدف ${m.target}</div></div>`;
+                    box.appendChild(row);
+                });
+                box.querySelectorAll('.admin-delete-mission').forEach(btn => btn.addEventListener('click', async () => {
+                    try {
+                        const r = await fetch('/api/missions/' + encodeURIComponent(btn.dataset.id), {method:'DELETE'});
+                        const data = await r.json();
+                        if (!r.ok || !data.success) throw new Error(data.error || 'تعذر حذف المهمة');
+                        showNotification('تم حذف المهمة 🗑️');
+                        await loadMissionsFromServer();
+                        renderModalBody();
+                    } catch (err) { showNotification(err.message || 'حدث خطأ'); }
+                }));
+            } catch (err) { box.innerHTML = '<div class="text-center text-[10px] text-rose-400">تعذر تحميل المهام.</div>'; }
+        }
+
+        function updateAdminVisibility() {
+            const btn = document.getElementById('adminPanelBtn');
+            if (btn) btn.classList.toggle('admin-visible', isAdminLoggedIn);
         }
 
         function showNotification(msg) {
