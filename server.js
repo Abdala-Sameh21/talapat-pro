@@ -14,10 +14,7 @@ const PORT = process.env.PORT || 3000;
 // MongoDB
 // ===============================
 
-// مهم:
-// لا تضع رابط MongoDB الحقيقي داخل GitHub.
-// استخدم Environment Variable باسم MONGODB_URI
-const MONGODB_URI = "mongodb+srv://bodacpm:112003Ab@cluster3.oqbrc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster3";
+const MONGODB_URI = process.env.MONGODB_URI || "";
 
 let client;
 let db;
@@ -33,17 +30,15 @@ let settingsCollection;
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// ملفات الموقع
 app.use(express.static(path.join(__dirname, ".")));
 
 // ===============================
-// Database Connection
+// Database
 // ===============================
 
 async function connectDB() {
     if (!MONGODB_URI) {
         console.error("❌ MONGODB_URI is not configured.");
-        console.log("Server will continue running without MongoDB.");
         return;
     }
 
@@ -58,15 +53,12 @@ async function connectDB() {
         missionsCollection = db.collection("missions");
         settingsCollection = db.collection("settings");
 
-        // Indexes
         await playersCollection.createIndex(
             { playerId: 1 },
             { unique: true, sparse: true }
         );
 
-        await playersCollection.createIndex(
-            { name: 1 }
-        );
+        await playersCollection.createIndex({ name: 1 });
 
         await missionsCollection.createIndex(
             { id: 1 },
@@ -120,7 +112,6 @@ function cleanRiders(riders) {
 
 function cleanPlayerData(body) {
     const playerId = cleanString(body.playerId);
-
     const name = cleanString(body.name);
 
     if (!playerId) {
@@ -133,7 +124,6 @@ function cleanPlayerData(body) {
 
     return {
         playerId,
-
         name,
 
         balance: cleanNumber(body.balance, 500),
@@ -147,7 +137,6 @@ function cleanPlayerData(body) {
         maxXp: cleanNumber(body.maxXp, 100),
 
         maxFleetSize: cleanNumber(body.maxFleetSize, 3),
-
         officeLevel: cleanNumber(body.officeLevel, 1),
 
         hasBoxUpgrade: Boolean(body.hasBoxUpgrade),
@@ -162,20 +151,11 @@ function cleanMission(body) {
     return {
         id: body.id || Date.now(),
 
-        title: cleanString(
-            body.title,
-            "مهمة جديدة"
-        ),
+        title: cleanString(body.title, "مهمة جديدة"),
 
-        rewardMoney: cleanNumber(
-            body.rewardMoney,
-            0
-        ),
+        rewardMoney: cleanNumber(body.rewardMoney, 0),
 
-        rewardXp: cleanNumber(
-            body.rewardXp,
-            40
-        ),
+        rewardXp: cleanNumber(body.rewardXp, 40),
 
         target: Math.max(
             1,
@@ -193,15 +173,13 @@ async function getAllPlayers() {
 
     return await playersCollection
         .find({})
-        .sort({
-            balance: -1
-        })
+        .sort({ balance: -1 })
         .limit(500)
         .toArray();
 }
 
 // ===============================
-// Health
+// HEALTH
 // ===============================
 
 app.get("/api/health", async (req, res) => {
@@ -217,7 +195,6 @@ app.get("/api/health", async (req, res) => {
 // PLAYERS
 // ===============================
 
-// كل اللاعبين
 app.get("/api/players", async (req, res) => {
     try {
         if (!playersCollection) {
@@ -227,7 +204,6 @@ app.get("/api/players", async (req, res) => {
         const players = await getAllPlayers();
 
         res.json(players);
-
     } catch (error) {
         console.error(error);
 
@@ -237,7 +213,6 @@ app.get("/api/players", async (req, res) => {
     }
 });
 
-// لاعب بالـ playerId
 app.get("/api/players/id/:playerId", async (req, res) => {
     try {
         if (!playersCollection) {
@@ -257,7 +232,6 @@ app.get("/api/players/id/:playerId", async (req, res) => {
         }
 
         res.json(player);
-
     } catch (error) {
         console.error(error);
 
@@ -267,7 +241,6 @@ app.get("/api/players/id/:playerId", async (req, res) => {
     }
 });
 
-// لاعب بالاسم
 app.get("/api/players/:name", async (req, res) => {
     try {
         if (!playersCollection) {
@@ -284,7 +257,7 @@ app.get("/api/players/:name", async (req, res) => {
 
         if (!player) {
             player = await playersCollection.findOne({
-                name: name
+                name
             });
         }
 
@@ -295,7 +268,6 @@ app.get("/api/players/:name", async (req, res) => {
         }
 
         res.json(player);
-
     } catch (error) {
         console.error(error);
 
@@ -305,11 +277,15 @@ app.get("/api/players/:name", async (req, res) => {
     }
 });
 
-// حفظ لاعب
+// ===============================
+// SAVE PLAYER
+// ===============================
+
 app.post("/api/players", async (req, res) => {
     try {
         if (!playersCollection) {
             return res.status(503).json({
+                success: false,
                 error: "Database unavailable"
             });
         }
@@ -330,24 +306,15 @@ app.post("/api/players", async (req, res) => {
 
         const players = await getAllPlayers();
 
-        // تحديث الـ leaderboard لكل الأجهزة
-        io.emit(
-            "leaderboard:update",
-            players
-        );
+        io.emit("leaderboard:update", players);
 
-        // إرسال تحديث للاعب نفسه
-        io.emit(
-            "player:update",
-            player
-        );
+        io.emit("player:update", player);
 
         res.json({
             success: true,
             player,
             players
         });
-
     } catch (error) {
         console.error(error);
 
@@ -359,10 +326,196 @@ app.post("/api/players", async (req, res) => {
 });
 
 // ===============================
+// ADMIN - PLAYER MANAGEMENT
+// ===============================
+
+// إضافة فلوس
+app.post("/api/admin/give-money", async (req, res) => {
+    try {
+        if (!playersCollection) {
+            return res.status(503).json({
+                success: false,
+                error: "Database unavailable"
+            });
+        }
+
+        const playerId = cleanString(req.body.playerId);
+        const amount = cleanNumber(req.body.amount, 0);
+
+        if (!playerId || amount <= 0) {
+            return res.status(400).json({
+                success: false,
+                error: "Invalid player or amount"
+            });
+        }
+
+        const result = await playersCollection.findOneAndUpdate(
+            {
+                playerId
+            },
+            {
+                $inc: {
+                    balance: amount
+                },
+                $set: {
+                    updatedAt: new Date()
+                }
+            },
+            {
+                returnDocument: "after"
+            }
+        );
+
+        if (!result.value) {
+            return res.status(404).json({
+                success: false,
+                error: "Player not found"
+            });
+        }
+
+        const players = await getAllPlayers();
+
+        io.emit("leaderboard:update", players);
+        io.emit("player:update", result.value);
+
+        res.json({
+            success: true,
+            player: result.value
+        });
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            success: false,
+            error: "Error adding money"
+        });
+    }
+});
+
+// تحديد الرصيد
+app.post("/api/admin/set-balance", async (req, res) => {
+    try {
+        if (!playersCollection) {
+            return res.status(503).json({
+                success: false,
+                error: "Database unavailable"
+            });
+        }
+
+        const playerId = cleanString(req.body.playerId);
+        const balance = Math.max(
+            0,
+            cleanNumber(req.body.balance, 0)
+        );
+
+        const result = await playersCollection.findOneAndUpdate(
+            {
+                playerId
+            },
+            {
+                $set: {
+                    balance,
+                    updatedAt: new Date()
+                }
+            },
+            {
+                returnDocument: "after"
+            }
+        );
+
+        if (!result.value) {
+            return res.status(404).json({
+                success: false,
+                error: "Player not found"
+            });
+        }
+
+        io.emit(
+            "leaderboard:update",
+            await getAllPlayers()
+        );
+
+        io.emit(
+            "player:update",
+            result.value
+        );
+
+        res.json({
+            success: true,
+            player: result.value
+        });
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            success: false,
+            error: "Error setting balance"
+        });
+    }
+});
+
+// تحديد المستوى
+app.post("/api/admin/set-level", async (req, res) => {
+    try {
+        if (!playersCollection) {
+            return res.status(503).json({
+                success: false,
+                error: "Database unavailable"
+            });
+        }
+
+        const playerId = cleanString(req.body.playerId);
+
+        const level = Math.max(
+            1,
+            cleanNumber(req.body.level, 1)
+        );
+
+        const result = await playersCollection.findOneAndUpdate(
+            {
+                playerId
+            },
+            {
+                $set: {
+                    level,
+                    updatedAt: new Date()
+                }
+            },
+            {
+                returnDocument: "after"
+            }
+        );
+
+        if (!result.value) {
+            return res.status(404).json({
+                success: false,
+                error: "Player not found"
+            });
+        }
+
+        io.emit(
+            "player:update",
+            result.value
+        );
+
+        res.json({
+            success: true,
+            player: result.value
+        });
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            success: false,
+            error: "Error setting level"
+        });
+    }
+});
+
+// ===============================
 // MISSIONS
 // ===============================
 
-// جلب المهمات
 app.get("/api/missions", async (req, res) => {
     try {
         if (!missionsCollection) {
@@ -378,7 +531,6 @@ app.get("/api/missions", async (req, res) => {
             .toArray();
 
         res.json(missions);
-
     } catch (error) {
         console.error(error);
 
@@ -388,22 +540,19 @@ app.get("/api/missions", async (req, res) => {
     }
 });
 
-// إنشاء مهمة من الإدارة
 app.post("/api/missions", async (req, res) => {
     try {
         if (!missionsCollection) {
             return res.status(503).json({
+                success: false,
                 error: "Database unavailable"
             });
         }
 
         const mission = cleanMission(req.body);
 
-        await missionsCollection.insertOne(
-            mission
-        );
+        await missionsCollection.insertOne(mission);
 
-        // إرسال المهمة فوراً لكل اللاعبين
         io.emit(
             "mission:new",
             mission
@@ -413,7 +562,6 @@ app.post("/api/missions", async (req, res) => {
             success: true,
             mission
         });
-
     } catch (error) {
         console.error(error);
 
@@ -424,11 +572,11 @@ app.post("/api/missions", async (req, res) => {
     }
 });
 
-// حذف مهمة
 app.delete("/api/missions/:missionId", async (req, res) => {
     try {
         if (!missionsCollection) {
             return res.status(503).json({
+                success: false,
                 error: "Database unavailable"
             });
         }
@@ -449,7 +597,6 @@ app.delete("/api/missions/:missionId", async (req, res) => {
         res.json({
             success: true
         });
-
     } catch (error) {
         console.error(error);
 
@@ -464,7 +611,6 @@ app.delete("/api/missions/:missionId", async (req, res) => {
 // BROADCAST
 // ===============================
 
-// جلب آخر إعلان
 app.get("/api/broadcast", async (req, res) => {
     try {
         if (!settingsCollection) {
@@ -480,7 +626,6 @@ app.get("/api/broadcast", async (req, res) => {
         res.json({
             text: setting?.text || ""
         });
-
     } catch (error) {
         console.error(error);
 
@@ -490,11 +635,11 @@ app.get("/api/broadcast", async (req, res) => {
     }
 });
 
-// إرسال إعلان
 app.post("/api/broadcast", async (req, res) => {
     try {
         if (!settingsCollection) {
             return res.status(503).json({
+                success: false,
                 error: "Database unavailable"
             });
         }
@@ -505,6 +650,7 @@ app.post("/api/broadcast", async (req, res) => {
 
         if (!text) {
             return res.status(400).json({
+                success: false,
                 error: "Broadcast text is required"
             });
         }
@@ -527,7 +673,6 @@ app.post("/api/broadcast", async (req, res) => {
             }
         );
 
-        // إرسال الإعلان لكل الأجهزة
         io.emit(
             "broadcast:new",
             text
@@ -537,7 +682,6 @@ app.post("/api/broadcast", async (req, res) => {
             success: true,
             text
         });
-
     } catch (error) {
         console.error(error);
 
@@ -548,11 +692,11 @@ app.post("/api/broadcast", async (req, res) => {
     }
 });
 
-// حذف الإعلان
 app.delete("/api/broadcast", async (req, res) => {
     try {
         if (!settingsCollection) {
             return res.status(503).json({
+                success: false,
                 error: "Database unavailable"
             });
         }
@@ -568,7 +712,6 @@ app.delete("/api/broadcast", async (req, res) => {
         res.json({
             success: true
         });
-
     } catch (error) {
         console.error(error);
 
@@ -590,33 +733,26 @@ io.on("connection", async (socket) => {
     );
 
     try {
-        // إرسال الـ leaderboard للاعب الجديد
         if (playersCollection) {
-            const players = await getAllPlayers();
-
             socket.emit(
                 "leaderboard:update",
-                players
+                await getAllPlayers()
             );
         }
 
-        // إرسال المهمات
         if (missionsCollection) {
-            const missions = await missionsCollection
-                .find({})
-                .sort({
-                    createdAt: -1
-                })
-                .limit(100)
-                .toArray();
-
             socket.emit(
                 "missions:init",
-                missions
+                await missionsCollection
+                    .find({})
+                    .sort({
+                        createdAt: -1
+                    })
+                    .limit(100)
+                    .toArray()
             );
         }
 
-        // إرسال الإعلان الحالي
         if (settingsCollection) {
             const broadcast =
                 await settingsCollection.findOne({
@@ -630,7 +766,6 @@ io.on("connection", async (socket) => {
                 );
             }
         }
-
     } catch (error) {
         console.error(
             "Socket initialization error:",
