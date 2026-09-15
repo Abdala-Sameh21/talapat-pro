@@ -81,7 +81,8 @@
                 </div>
                 <h2 class="text-xl font-black text-white mb-1">تسجيل مدير الشركة</h2>
                 <p class="text-[10px] text-gray-400 mb-4">اكتب اسمك للبدء في حفظ إنجازاتك</p>
-                <input type="text" id="usernameInput" class="w-full bg-slate-900 border border-slate-700 text-white text-center text-sm py-3 px-4 rounded-xl outline-none focus:border-orange-500 mb-4 transition" placeholder="اسم المدير العام" maxlength="15">
+                <input type="text" id="usernameInput" class="w-full bg-slate-900 border border-slate-700 text-white text-center text-sm py-3 px-4 rounded-xl outline-none focus:border-orange-500 mb-2 transition" placeholder="اسم المدير العام" maxlength="15" autocomplete="username">
+                <input type="password" id="passwordInput" class="w-full bg-slate-900 border border-slate-700 text-white text-center text-sm py-3 px-4 rounded-xl outline-none focus:border-orange-500 mb-4 transition" placeholder="كلمة المرور (للأدمن فقط)" autocomplete="current-password">
                 <button id="loginBtn" type="button" class="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 font-black py-3 rounded-xl shadow-lg text-sm cursor-pointer">بدء اللعبة 🌍</button>
             </div>
         </div>
@@ -185,6 +186,9 @@
                     <div><input id="adminLevelInput" type="number" min="1" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs" placeholder="المستوى"><button id="adminSetLevelBtn" class="w-full mt-1 bg-purple-500 text-white rounded-lg py-1.5 text-[10px] font-bold">تحديد المستوى</button></div>
                 </div>
                 <textarea id="adminBroadcastInput" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs mb-1" rows="3" placeholder="رسالة عامة للاعبين"></textarea>
+                <select id="adminBroadcastDuration" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs mb-1">
+                    <option value="20s">20 ثانية</option><option value="1h">ساعة</option><option value="1d">يوم</option><option value="3d">3 أيام</option>
+                </select>
                 <button id="adminBroadcastBtn" class="w-full bg-orange-500 text-slate-950 rounded-xl py-2 text-[10px] font-black mb-4">إرسال رسالة عامة 📢</button>
                 <div class="border-t border-slate-800 pt-3"><h4 class="text-cyan-400 text-xs font-black mb-2">إدارة المهام</h4>
                     <input id="adminMissionTitle" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs mb-1" placeholder="عنوان المهمة">
@@ -290,7 +294,7 @@
             const savedUser = localStorage.getItem('game_username');
             if (savedUser) {
                 document.getElementById('userDisplayName').innerText = savedUser;
-                if(savedUser.toLowerCase() === 'admin') isAdminLoggedIn = true;
+                if(savedUser === 'Boda' && localStorage.getItem('admin_token')) isAdminLoggedIn = true;
             }
             updateAdminVisibility();
             initSocket();
@@ -308,33 +312,41 @@
                 }
             });
 
-            document.getElementById('loginBtn').addEventListener('click', () => {
+            document.getElementById('loginBtn').addEventListener('click', async () => {
                 const input = document.getElementById('usernameInput').value.trim();
-                if (input !== '') {
-                    if (input.toLowerCase() === 'admin') {
-                        const pass = prompt('أدخل كلمة مرور الأدمن:');
-                        if (pass === '1234') {
-                            isAdminLoggedIn = true;
-                            localStorage.setItem('game_username', input);
-                            updateAdminVisibility();
-                            document.getElementById('userDisplayName').innerText = input;
-                            document.getElementById('loginScreen').style.display = 'none';
-                            loadPlayerFromServer(input).then(() => startMainGame());
-                            showNotification('تم تسجيل دخول الأدمن بنجاح 🛠️');
-                        } else {
-                            alert('كلمة المرور غير صحيحة!');
-                            return;
-                        }
+                const password = document.getElementById('passwordInput')?.value || '';
+                if (!input) return alert('اكتب اسم المستخدم أولاً.');
+
+                try {
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: input, password, playerId })
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) throw new Error(data.error || 'تعذر تسجيل الدخول');
+
+                    if (data.isAdmin) {
+                        isAdminLoggedIn = true;
+                        localStorage.setItem('admin_token', data.token);
+                        playerId = data.playerId;
+                        localStorage.setItem('game_player_id', playerId);
                     } else {
-                        localStorage.setItem('game_username', input);
                         isAdminLoggedIn = false;
-                        updateAdminVisibility();
-                        document.getElementById('userDisplayName').innerText = input;
-                        document.getElementById('loginScreen').style.display = 'none';
-                        loadPlayerFromServer(input).then(() => startMainGame());
+                        localStorage.removeItem('admin_token');
+                        playerId = data.playerId || playerId;
+                        localStorage.setItem('game_player_id', playerId);
                     }
-                } else {
-                    alert('الرجاء إدخال اسم المدير العام!');
+
+                    localStorage.setItem('game_username', data.name || input);
+                    updateAdminVisibility();
+                    document.getElementById('userDisplayName').innerText = data.name || input;
+                    document.getElementById('loginScreen').style.display = 'none';
+                    await loadPlayerFromServer(data.name || input);
+                    startMainGame();
+                    if (data.isAdmin) showNotification('تم تسجيل دخول الأدمن بنجاح 🛡️');
+                } catch (err) {
+                    alert(err.message || 'تعذر تسجيل الدخول');
                 }
             });
 
@@ -376,7 +388,7 @@
             });
 
             document.getElementById('headerBroadcastBtn').addEventListener('click', () => {
-                fetch('/api/broadcast').then(r => r.json()).then(d => { if (d.text) showBroadcast(d.text); else alert('لا توجد إشعارات جديدة حالياً.'); }).catch(() => alert('تعذر جلب الإشعار.'));
+                fetch('/api/broadcast').then(r => r.json()).then(d => { if (d.text) showBroadcast(d.text, d.expiresAt); else alert('لا توجد إشعارات جديدة حالياً.'); }).catch(() => alert('تعذر جلب الإشعار.'));
             });
 
             const adminPanelBtn = document.getElementById('adminPanelBtn');
@@ -522,7 +534,7 @@
             socket.on('player:update', (data) => {
                 if (data?.playerId !== playerId) return;
                 applyPlayerData(data);
-                showNotification('🔄 تم تحديث بيانات حسابك من الإدارة.');
+                // تحديث صامت من الإدارة: لا نعرض أي رسالة للمستخدم.
             });
             socket.on('leaderboard:update', (players) => {
                 if (Array.isArray(players)) allPlayersDB = players;
@@ -542,18 +554,39 @@
                 customMissions = customMissions.filter(m => String(m.id) !== String(missionId));
                 if (activeModalSection === 'missions-section-modal') renderModalBody();
             });
-            socket.on('broadcast:new', showBroadcast);
+            socket.on('broadcast:new', (broadcast) => {
+                if (broadcast?.text) showBroadcast(broadcast.text, broadcast.expiresAt);
+            });
             socket.on('broadcast:clear', () => {
                 document.getElementById('globalBroadcastBanner').style.display = 'none';
                 document.getElementById('broadcastDot').style.display = 'none';
             });
         }
 
-        function showBroadcast(text) {
+        let broadcastHideTimer = null;
+
+        function showBroadcast(text, expiresAt) {
             if (!text) return;
+            const banner = document.getElementById('globalBroadcastBanner');
+            const dot = document.getElementById('broadcastDot');
+            if (!banner) return;
+            if (broadcastHideTimer) clearTimeout(broadcastHideTimer);
             document.getElementById('broadcastText').innerText = text;
-            document.getElementById('globalBroadcastBanner').style.display = 'flex';
-            document.getElementById('broadcastDot').style.display = 'block';
+            banner.style.display = 'flex';
+            if (dot) dot.style.display = 'block';
+
+            if (expiresAt) {
+                const remaining = new Date(expiresAt).getTime() - Date.now();
+                if (remaining <= 0) {
+                    banner.style.display = 'none';
+                    if (dot) dot.style.display = 'none';
+                    return;
+                }
+                broadcastHideTimer = setTimeout(() => {
+                    banner.style.display = 'none';
+                    if (dot) dot.style.display = 'none';
+                }, remaining);
+            }
         }
 
         // دالة جلب قائمة كل اللاعبين من MongoDB لتعرضها في لوحة الشرف
@@ -570,7 +603,7 @@
         }
 
         function startMainGame() {
-            fetch('/api/broadcast').then(r => r.json()).then(d => { if (d.text) showBroadcast(d.text); }).catch(() => {});
+            fetch('/api/broadcast').then(r => r.json()).then(d => { if (d.text) showBroadcast(d.text, d.expiresAt); }).catch(() => {});
             logMsg(`🚀 جاري رصد إحداثيات GPS وسحب المحلات والشوارع المحيطة...`);
             
             let gpsResolved = false;
@@ -932,7 +965,14 @@
                     <div class="glass-panel p-3 rounded-xl flex flex-col gap-2">
                         <div class="text-[10px] text-gray-400">Broadcast للاعبين:</div>
                         <textarea id="adminBroadcastInput" rows="2" class="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-2 py-2 text-[10px] outline-none resize-none" placeholder="اكتب رسالة عامة..."></textarea>
+                        <select id="adminBroadcastDuration" class="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-2 py-2 text-[10px] outline-none">
+                            <option value="20s">مدة ظهور الإشعار: 20 ثانية</option>
+                            <option value="1h">مدة ظهور الإشعار: ساعة</option>
+                            <option value="1d">مدة ظهور الإشعار: يوم</option>
+                            <option value="3d">مدة ظهور الإشعار: 3 أيام</option>
+                        </select>
                         <button id="adminBroadcastBtn" type="button" class="w-full bg-cyan-600 text-white py-2 rounded-xl text-[10px] font-black cursor-pointer">إرسال الرسالة 📢</button>
+                        <div id="adminBroadcastStatus" class="text-[9px] text-emerald-400 text-right"></div>
                     </div>
 
                     <div class="glass-panel p-3 rounded-xl flex flex-col gap-2">
@@ -966,7 +1006,7 @@
                         if (!requirePlayer()) return;
                         const amount = Number(btn.dataset.amount);
                         try {
-                            const r = await fetch('/api/admin/give-money', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({playerId: select.value, amount}) });
+                            const r = await fetch('/api/admin/give-money', { method: 'POST', headers: {'Content-Type':'application/json', 'x-admin-token': localStorage.getItem('admin_token') || ''}, body: JSON.stringify({playerId: select.value, amount}) });
                             const data = await r.json();
                             if (!r.ok || !data.success) throw new Error(data.error || 'تعذر تنفيذ العملية');
                             showNotification(`تمت إضافة ${amount}ج للاعب ✅`);
@@ -981,7 +1021,7 @@
                     const balanceValue = Math.max(0, Number(document.getElementById('adminBalanceInput').value));
                     if (!Number.isFinite(balanceValue)) return showNotification('أدخل رصيدًا صحيحًا');
                     try {
-                        const r = await fetch('/api/admin/set-balance', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({playerId: select.value, balance: balanceValue}) });
+                        const r = await fetch('/api/admin/set-balance', { method: 'POST', headers: {'Content-Type':'application/json', 'x-admin-token': localStorage.getItem('admin_token') || ''}, body: JSON.stringify({playerId: select.value, balance: balanceValue}) });
                         const data = await r.json();
                         if (!r.ok || !data.success) throw new Error(data.error || 'تعذر تحديد الرصيد');
                         showNotification('تم تحديد الرصيد ✅'); await fetchPlayersFromMongoDB(); renderModalBody();
@@ -993,7 +1033,7 @@
                     const levelValue = Math.max(1, Number(document.getElementById('adminLevelInput').value));
                     if (!Number.isFinite(levelValue)) return showNotification('أدخل مستوى صحيحًا');
                     try {
-                        const r = await fetch('/api/admin/set-level', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({playerId: select.value, level: levelValue}) });
+                        const r = await fetch('/api/admin/set-level', { method: 'POST', headers: {'Content-Type':'application/json', 'x-admin-token': localStorage.getItem('admin_token') || ''}, body: JSON.stringify({playerId: select.value, level: levelValue}) });
                         const data = await r.json();
                         if (!r.ok || !data.success) throw new Error(data.error || 'تعذر تحديد المستوى');
                         showNotification('تم تحديد المستوى ✅'); await fetchPlayersFromMongoDB(); renderModalBody();
@@ -1004,7 +1044,7 @@
                     const text = document.getElementById('adminBroadcastInput').value.trim();
                     if (!text) return showNotification('اكتب الرسالة أولاً');
                     try {
-                        const r = await fetch('/api/broadcast', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({text}) });
+                        const r = await fetch('/api/broadcast', { method: 'POST', headers: {'Content-Type':'application/json', 'x-admin-token': localStorage.getItem('admin_token') || ''}, body: JSON.stringify({text, duration: document.getElementById('adminBroadcastDuration')?.value || '20s'}) });
                         const data = await r.json();
                         if (!r.ok || !data.success) throw new Error(data.error || 'تعذر إرسال الرسالة');
                         document.getElementById('adminBroadcastInput').value = '';
@@ -1063,12 +1103,25 @@
         async function openAdminPanel() {
             await refreshAdminPlayers();
             renderAdminMissions();
+            try {
+                const r = await fetch('/api/broadcast');
+                const data = await r.json();
+                const status = document.getElementById('adminBroadcastStatus');
+                if (status && data.text && data.expiresAt) {
+                    const remaining = Math.max(0, new Date(data.expiresAt).getTime() - Date.now());
+                    const mins = Math.floor(remaining / 60000);
+                    const secs = Math.floor((remaining % 60000) / 1000);
+                    status.textContent = `الإشعار الحالي: ${data.duration || ''} — المتبقي ${mins ? mins + ' د' : secs + ' ث'}`;
+                } else if (status) {
+                    status.textContent = 'لا يوجد إشعار نشط حاليًا.';
+                }
+            } catch (_) {}
         }
 
         function selectedAdminPlayerId() { return document.getElementById('adminPlayerSelect')?.value || ''; }
 
         async function adminPost(url, body) {
-            const response = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+            const response = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json', 'x-admin-token': localStorage.getItem('admin_token') || ''}, body:JSON.stringify(body) });
             const data = await response.json();
             if (!response.ok || !data.success) throw new Error(data.error || 'Admin request failed');
             return data;
@@ -1086,7 +1139,15 @@
         async function adminBroadcast() {
             const text = document.getElementById('adminBroadcastInput').value.trim();
             if (!text) return;
-            try { await adminPost('/api/broadcast', { text }); document.getElementById('adminBroadcastInput').value=''; showNotification('تم إرسال الرسالة لجميع اللاعبين.'); } catch(e) { alert(e.message); }
+            const duration = document.getElementById('adminBroadcastDuration')?.value || '20s';
+            try {
+                const data = await adminPost('/api/broadcast', { text, duration });
+                document.getElementById('adminBroadcastInput').value='';
+                const labels = { '20s':'20 ثانية', '1h':'ساعة', '1d':'يوم', '3d':'3 أيام' };
+                const status = document.getElementById('adminBroadcastStatus');
+                if (status) status.textContent = `الإشعار الحالي: ${labels[duration] || duration}`;
+                showNotification('تم إرسال الرسالة لجميع اللاعبين 📢');
+            } catch(e) { alert(e.message); }
         }
         async function adminCreateMission() {
             const title=document.getElementById('adminMissionTitle').value.trim();
@@ -1097,7 +1158,7 @@
         function renderAdminMissions() {
             const box=document.getElementById('adminMissionsList'); if(!box) return;
             box.innerHTML=customMissions.map(m=>`<div class="bg-slate-900 rounded-lg p-2 flex justify-between items-center"><button class="admin-delete-mission bg-rose-600 text-white px-2 py-1 rounded text-[9px]" data-id="${m.id}">حذف</button><span class="text-[9px] text-gray-300">${m.title} — ${m.rewardMoney}ج / ${m.target}</span></div>`).join('');
-            box.querySelectorAll('.admin-delete-mission').forEach(btn=>btn.addEventListener('click',async()=>{ try { const r=await fetch('/api/missions/'+encodeURIComponent(btn.dataset.id),{method:'DELETE'}); if(!r.ok) throw new Error('تعذر حذف المهمة'); showNotification('تم حذف المهمة.'); } catch(e){alert(e.message);} }));
+            box.querySelectorAll('.admin-delete-mission').forEach(btn=>btn.addEventListener('click',async()=>{ try { const r=await fetch('/api/missions/'+encodeURIComponent(btn.dataset.id),{method:'DELETE', headers:{'x-admin-token':localStorage.getItem('admin_token')||''}}); if(!r.ok) throw new Error('تعذر حذف المهمة'); showNotification('تم حذف المهمة.'); } catch(e){alert(e.message);} }));
         }
 
         async function loadMissionsFromServer() {
@@ -1131,7 +1192,7 @@
                 });
                 box.querySelectorAll('.admin-delete-mission').forEach(btn => btn.addEventListener('click', async () => {
                     try {
-                        const r = await fetch('/api/missions/' + encodeURIComponent(btn.dataset.id), {method:'DELETE'});
+                        const r = await fetch('/api/missions/' + encodeURIComponent(btn.dataset.id), {method:'DELETE', headers:{'x-admin-token':localStorage.getItem('admin_token')||''}});
                         const data = await r.json();
                         if (!r.ok || !data.success) throw new Error(data.error || 'تعذر حذف المهمة');
                         showNotification('تم حذف المهمة 🗑️');
@@ -1144,9 +1205,10 @@
 
         function updateAdminVisibility() {
             const btn = document.getElementById('adminPanelBtn');
+            const allowed = isAdminLoggedIn && localStorage.getItem('admin_token');
             if (btn) {
-                btn.classList.toggle('admin-visible', isAdminLoggedIn);
-                btn.style.setProperty('display', isAdminLoggedIn ? 'flex' : 'none', 'important');
+                btn.classList.toggle('admin-visible', !!allowed);
+                btn.style.display = allowed ? 'flex' : 'none';
             }
         }
 
