@@ -167,6 +167,7 @@
                 <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="missions-section-modal"><span>المهمات والإنجازات</span><i class="fa-solid fa-bullseye text-rose-400 w-5 text-center"></i></button>
                 <button type="button" class="sidebar-tab-btn flex items-center justify-end gap-3 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-white cursor-pointer" data-target="top-players-section-modal"><span>لوحة الشرف (التوب)</span><i class="fa-solid fa-trophy text-amber-300 w-5 text-center"></i></button>
                 <button id="adminPanelBtn" type="button" class="flex items-center justify-end gap-3 p-3 rounded-xl bg-gradient-to-r from-red-600/30 to-orange-500/20 border border-red-500/40 text-xs font-black text-white cursor-pointer" data-target="admin-panel-section-modal" style="display:none !important;"><span>لوحة تحكم الأدمن</span><i class="fa-solid fa-user-shield text-red-400 w-5 text-center"></i></button>
+                <button id="logoutBtn" type="button" class="flex items-center justify-end gap-3 p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-xs font-black text-rose-300 cursor-pointer"><span>تسجيل الخروج</span><i class="fa-solid fa-right-from-bracket text-rose-400 w-5 text-center"></i></button>
             </div>
         </div>
 
@@ -394,6 +395,7 @@
             const adminPanelBtn = document.getElementById('adminPanelBtn');
             updateAdminVisibility();
             adminPanelBtn?.addEventListener('click', async () => { closeSidebar(); document.getElementById('adminModal').style.display = 'flex'; await openAdminPanel(); });
+            document.getElementById('logoutBtn')?.addEventListener('click', logoutPlayer);
             document.getElementById('closeAdminModalBtn')?.addEventListener('click', () => document.getElementById('adminModal').style.display = 'none');
             document.querySelectorAll('.admin-money-btn').forEach(btn => btn.addEventListener('click', () => adminGiveMoney(Number(btn.dataset.amount))));
             document.getElementById('adminSetBalanceBtn')?.addEventListener('click', adminSetBalance);
@@ -402,6 +404,24 @@
             document.getElementById('adminCreateMissionBtn')?.addEventListener('click', adminCreateMission);
 
             setInterval(() => { generateOrder(); }, 5000);
+        }
+
+        // تسجيل الخروج من الحساب الحالي
+        function logoutPlayer() {
+            if (saveTimer) {
+                clearTimeout(saveTimer);
+                saveTimer = null;
+            }
+
+            localStorage.removeItem('game_username');
+            localStorage.removeItem('game_player_id');
+            localStorage.removeItem('admin_token');
+
+            isGameDataLoaded = false;
+            isAdminLoggedIn = false;
+
+            // بعد الخروج، ارجع لشاشة تسجيل الدخول
+            window.location.reload();
         }
 
         // ===============================
