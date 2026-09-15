@@ -189,6 +189,7 @@
                 <button id="adminBroadcastBtn" class="w-full bg-orange-500 text-slate-950 rounded-xl py-2 text-[10px] font-black mb-4">إرسال رسالة عامة 📢</button>
                 <div class="border-t border-slate-800 pt-3"><h4 class="text-cyan-400 text-xs font-black mb-2">إدارة المهام</h4>
                     <input id="adminMissionTitle" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs mb-1" placeholder="عنوان المهمة">
+                    <select id="adminMissionType" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs mb-1 text-white"><option value="delivery">📦 توصيل طلب</option><option value="office_upgrade">🏢 تطوير الشركة</option><option value="restaurant_contract">🍽️ التعاقد مع مطعم</option><option value="tax_paid">🧾 سداد ضريبة</option></select>
                     <div class="grid grid-cols-3 gap-1.5 mb-1"><input id="adminMissionMoney" type="number" min="0" class="bg-slate-900 border border-slate-700 rounded-lg p-2 text-[10px]" placeholder="جنيه"><input id="adminMissionXp" type="number" min="0" class="bg-slate-900 border border-slate-700 rounded-lg p-2 text-[10px]" placeholder="XP"><input id="adminMissionTarget" type="number" min="1" class="bg-slate-900 border border-slate-700 rounded-lg p-2 text-[10px]" placeholder="الهدف"></div>
                     <button id="adminCreateMissionBtn" class="w-full bg-cyan-600 text-white rounded-xl py-2 text-[10px] font-bold mb-2">إنشاء مهمة</button>
                     <div id="adminMissionsList" class="flex flex-col gap-1.5"></div>
@@ -477,7 +478,7 @@
                 const missions = await response.json();
                 if (Array.isArray(missions)) {
                     customMissions = missions.map(m => ({
-                        id: m.id, title: m.title, rewardMoney: Number(m.rewardMoney || 0),
+                        id: m.id, title: m.title, type: m.type || 'delivery', rewardMoney: Number(m.rewardMoney || 0),
                         rewardXp: Number(m.rewardXp || 0), progress: 0, target: Math.max(1, Number(m.target || 1)), claimed: false
                     }));
                     missionsLoadedFromServer = true;
@@ -528,7 +529,7 @@
             });
             socket.on('missions:init', (missions) => {
                 if (!missionsLoadedFromServer && Array.isArray(missions)) {
-                    customMissions = missions.map(m => ({ id: m.id, title: m.title, rewardMoney: Number(m.rewardMoney || 0), rewardXp: Number(m.rewardXp || 0), progress: 0, target: Math.max(1, Number(m.target || 1)), claimed: false }));
+                    customMissions = missions.map(m => ({ id: m.id, title: m.title, type: m.type || 'delivery', rewardMoney: Number(m.rewardMoney || 0), rewardXp: Number(m.rewardXp || 0), progress: 0, target: Math.max(1, Number(m.target || 1)), claimed: false }));
                 }
             });
             socket.on('mission:new', (mission) => {
@@ -937,6 +938,9 @@
                     <div class="glass-panel p-3 rounded-xl flex flex-col gap-2">
                         <div class="text-[10px] text-gray-400">إنشاء مهمة جديدة:</div>
                         <input id="adminMissionTitle" class="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-2 py-2 text-[10px] outline-none" placeholder="اسم المهمة">
+                        <select id="adminMissionType" class="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-2 py-2 text-[10px] outline-none">
+                            <option value="delivery">📦 توصيل طلب</option><option value="office_upgrade">🏢 تطوير الشركة</option><option value="restaurant_contract">🍽️ التعاقد مع مطعم</option><option value="tax_paid">🧾 سداد ضريبة</option>
+                        </select>
                         <div class="grid grid-cols-3 gap-2">
                             <input id="adminMissionMoney" type="number" min="0" class="bg-slate-950 border border-slate-700 text-white rounded-xl px-2 py-2 text-[10px] outline-none" placeholder="جائزة المال">
                             <input id="adminMissionXp" type="number" min="0" class="bg-slate-950 border border-slate-700 text-white rounded-xl px-2 py-2 text-[10px] outline-none" placeholder="XP">
@@ -1010,12 +1014,13 @@
 
                 document.getElementById('adminCreateMissionBtn').addEventListener('click', async () => {
                     const title = document.getElementById('adminMissionTitle').value.trim();
+                    const type = document.getElementById('adminMissionType')?.value || 'delivery';
                     const rewardMoney = Math.max(0, Number(document.getElementById('adminMissionMoney').value || 0));
                     const rewardXp = Math.max(0, Number(document.getElementById('adminMissionXp').value || 0));
                     const target = Math.max(1, Number(document.getElementById('adminMissionTarget').value || 1));
                     if (!title) return showNotification('اكتب اسم المهمة أولاً');
                     try {
-                        const r = await fetch('/api/missions', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({title, rewardMoney, rewardXp, target}) });
+                        const r = await fetch('/api/missions', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({title, type, rewardMoney, rewardXp, target}) });
                         const data = await r.json();
                         if (!r.ok || !data.success) throw new Error(data.error || 'تعذر إنشاء المهمة');
                         showNotification('تم إنشاء المهمة 🎯');
@@ -1085,8 +1090,9 @@
         }
         async function adminCreateMission() {
             const title=document.getElementById('adminMissionTitle').value.trim();
+            const type=document.getElementById('adminMissionType')?.value || 'delivery';
             if(!title) return alert('اكتب عنوان المهمة.');
-            try { await adminPost('/api/missions', { id:Date.now(), title, rewardMoney:Number(document.getElementById('adminMissionMoney').value||0), rewardXp:Number(document.getElementById('adminMissionXp').value||0), target:Number(document.getElementById('adminMissionTarget').value||1) }); document.getElementById('adminMissionTitle').value=''; renderAdminMissions(); showNotification('تم إنشاء المهمة.'); } catch(e) { alert(e.message); }
+            try { await adminPost('/api/missions', { id:Date.now(), title, type, rewardMoney:Number(document.getElementById('adminMissionMoney').value||0), rewardXp:Number(document.getElementById('adminMissionXp').value||0), target:Number(document.getElementById('adminMissionTarget').value||1) }); document.getElementById('adminMissionTitle').value=''; renderAdminMissions(); showNotification('تم إنشاء المهمة.'); } catch(e) { alert(e.message); }
         }
         function renderAdminMissions() {
             const box=document.getElementById('adminMissionsList'); if(!box) return;
@@ -1099,7 +1105,7 @@
                 const response = await fetch('/api/missions');
                 const data = await response.json();
                 if (Array.isArray(data) && data.length) {
-                    customMissions = data.map(m => ({...m, progress: 0, claimed: false}));
+                    customMissions = data.map(m => ({...m, type: m.type || 'delivery', progress: 0, claimed: false}));
                 }
             } catch (err) {
                 console.error('خطأ في تحميل المهام:', err);
@@ -1209,6 +1215,7 @@
                 balance -= taxDue;
                 showNotification(`تم سداد الضرائب بقيمة ${taxDue} جنيه.`);
                 taxDue = 0;
+                incrementMissionProgress('tax_paid');
                 updateUI();
                 if(document.getElementById('contentModal').style.display === 'flex') renderModalBody();
             } else { showNotification('رصيدك لا يكفي لسداد الضرائب!'); }
@@ -1220,6 +1227,17 @@
             showNotification('تم الحصول على قرض طوارئ بقيمة 500ج.');
             updateUI();
             if(document.getElementById('contentModal').style.display === 'flex') renderModalBody();
+        }
+
+        function incrementMissionProgress(type, amount = 1) {
+            let changed = false;
+            customMissions.forEach(m => {
+                if (m.claimed || m.type !== type || m.progress >= m.target) return;
+                m.progress = Math.min(m.target, m.progress + amount);
+                changed = true;
+                if (m.progress >= m.target) showNotification(`🎯 اكتملت المهمة: ${m.title}`);
+            });
+            if (changed) updateUI();
         }
 
         function claimMissionReward(index) {
@@ -1246,7 +1264,7 @@
                 balance -= 150;
                 rest.contractType = 'basic';
                 rest.ordersLeft = 10;
-                customMissions.forEach(m => { if (m.title.includes('مطعم') && m.progress < m.target) m.progress++; });
+                incrementMissionProgress('restaurant_contract');
                 showNotification(`تم التعاقد مع ${rest.name}!`);
                 updateUI();
             } else { alert('رصيد غير كافٍ!'); }
@@ -1257,6 +1275,7 @@
                 balance -= 500;
                 officeLevel++;
                 maxFleetSize += 2;
+                incrementMissionProgress('office_upgrade');
                 showNotification(`تمت توسعة المكتب!`);
                 updateUI();
                 if(document.getElementById('contentModal').style.display === 'flex') renderModalBody();
@@ -1360,9 +1379,7 @@
                     taxDue += Math.floor(netProfit * 0.20);
                     addXp(25);
                     
-                    customMissions.forEach(m => {
-                        if(m.title.includes('طلب') && m.progress < m.target) m.progress++;
-                    });
+                    incrementMissionProgress('delivery');
 
                     rider.status = 'متاح';
                     showNotification(`تم التسليم بنجاح! أرباحك: +${netProfit}ج`);
