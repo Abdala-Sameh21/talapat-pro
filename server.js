@@ -12,6 +12,12 @@ const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 
 // =========================
+// Admin Credentials
+// =========================
+const ADMIN_USERNAME = "Boda";
+const ADMIN_PASSWORD = "2611";
+
+// =========================
 // Environment Variables
 // =========================
 
@@ -313,53 +319,30 @@ app.post(
         try {
 
             if (!playersCollection) {
-
                 return res.status(503).json({
                     success: false,
-                    error:
-                        "قاعدة البيانات غير متاحة حالياً."
+                    error: "قاعدة البيانات غير متاحة حالياً."
                 });
-
             }
 
-            const name = cleanString(
-                req.body.name
-            );
-
-            const password = cleanString(
-                req.body.password
-            );
-
-            const requestedPlayerId =
-                cleanString(
-                    req.body.playerId
-                );
+            const name = cleanString(req.body.name);
+            const password = cleanString(req.body.password);
+            const requestedPlayerId = cleanString(req.body.playerId);
 
             if (!name) {
-
                 return res.status(400).json({
                     success: false,
-                    error:
-                        "اكتب اسم المستخدم أولاً."
+                    error: "اكتب اسم المستخدم أولاً."
                 });
-
             }
 
             // =========================
             // ADMIN CREDENTIALS
             // =========================
 
-            const ADMIN_USERNAME = "Boda";
-            const ADMIN_PASSWORD = "2611";
-
-            const usernameKey =
-                normalizeUsername(name);
-
+            const usernameKey = normalizeUsername(name);
             const isAdminName =
-                usernameKey ===
-                normalizeUsername(
-                    ADMIN_USERNAME
-                );
+                usernameKey === normalizeUsername(ADMIN_USERNAME);
 
             // =========================
             // ADMIN
@@ -367,32 +350,23 @@ app.post(
 
             if (isAdminName) {
 
-                if (
-                    !password ||
-                    password !== ADMIN_PASSWORD
-                ) {
-
+                // الباسورد مطلوب للأدمن فقط
+                if (!password || password !== ADMIN_PASSWORD) {
                     return res.status(401).json({
                         success: false,
-                        error:
-                            "كلمة مرور الأدمن غير صحيحة."
+                        error: "كلمة مرور الأدمن غير صحيحة."
                     });
-
                 }
 
                 let adminPlayer =
-                    await playersCollection.findOne({
-                        usernameKey
-                    });
+                    await playersCollection.findOne({ usernameKey });
 
                 // دعم الحساب القديم
                 if (!adminPlayer) {
-
                     adminPlayer =
                         await playersCollection.findOne({
                             name: ADMIN_USERNAME
                         });
-
                 }
 
                 const playerId =
@@ -400,150 +374,71 @@ app.post(
                     requestedPlayerId ||
                     `player_${crypto.randomBytes(12).toString("hex")}`;
 
-                const token =
-                    createAdminToken();
-
+                const token = createAdminToken();
                 activeAdminTokens.add(token);
 
-                if (
-                    activeAdminTokens.size > 100
-                ) {
-
+                if (activeAdminTokens.size > 100) {
                     const firstToken =
-                        activeAdminTokens
-                            .values()
-                            .next()
-                            .value;
+                        activeAdminTokens.values().next().value;
 
                     if (firstToken) {
-                        activeAdminTokens.delete(
-                            firstToken
-                        );
+                        activeAdminTokens.delete(firstToken);
                     }
-
                 }
 
                 const adminData = {
-
                     playerId,
-
                     name: ADMIN_USERNAME,
-
                     usernameKey,
-
                     updatedAt: new Date()
-
                 };
 
                 await playersCollection.updateOne(
-
-                    {
-                        playerId
-                    },
-
+                    { playerId },
                     {
                         $set: adminData,
-
                         $setOnInsert: {
-
                             balance: 500,
-
                             totalRevenue: 0,
-
                             taxDue: 0,
-
                             rating: 4.8,
-
                             level: 1,
-
                             xp: 0,
-
                             maxXp: 100,
-
                             maxFleetSize: 3,
-
                             officeLevel: 1,
-
                             hasBoxUpgrade: false,
-
                             riders: []
-
                         }
                     },
-
-                    {
-                        upsert: true
-                    }
-
+                    { upsert: true }
                 );
 
                 const player =
-                    await playersCollection.findOne({
-                        playerId
-                    });
+                    await playersCollection.findOne({ playerId });
 
                 return res.json({
-
                     success: true,
-
                     isAdmin: true,
-
                     token,
-
-                    playerId:
-                        player.playerId,
-
-                    name:
-                        player.name,
-
+                    playerId: player.playerId,
+                    name: player.name,
                     player
-
                 });
-
             }
-
-            // =========================
-            // باقي تسجيل دخول اللاعبين
-            // =========================
-
-            // الكود الموجود عندك بعد الجزء ده
-            // يفضل كما هو بدون تغيير.
-
-        } catch (error) {
-
-            console.error(
-                "Login error:",
-                error
-            );
-
-            return res.status(500).json({
-                success: false,
-                error:
-                    "حدث خطأ أثناء تسجيل الدخول."
-            });
-
-        }
-
-    }
-);
 
             // =========================
             // NORMAL USER
             // =========================
+            // لا يوجد باسورد للاعب العادي.
 
             let existingPlayer =
-                await playersCollection.findOne({
-                    usernameKey
-                });
+                await playersCollection.findOne({ usernameKey });
 
             // دعم الحسابات القديمة
             if (!existingPlayer) {
-
                 existingPlayer =
-                    await playersCollection.findOne({
-                        name
-                    });
-
+                    await playersCollection.findOne({ name });
             }
 
             // الاسم موجود
@@ -552,39 +447,22 @@ app.post(
                 // نفس الحساب
                 if (
                     requestedPlayerId &&
-                    existingPlayer.playerId ===
-                    requestedPlayerId
+                    existingPlayer.playerId === requestedPlayerId
                 ) {
-
                     return res.json({
-
                         success: true,
-
                         isAdmin: false,
-
-                        playerId:
-                            existingPlayer.playerId,
-
-                        name:
-                            existingPlayer.name,
-
-                        player:
-                            existingPlayer
-
+                        playerId: existingPlayer.playerId,
+                        name: existingPlayer.name,
+                        player: existingPlayer
                     });
-
                 }
 
                 // شخص آخر
                 return res.status(409).json({
-
                     success: false,
-
-                    error:
-                        "اسم المستخدم مستخدم بالفعل. اختار اسم تاني."
-
+                    error: "اسم المستخدم مستخدم بالفعل. اختار اسم تاني."
                 });
-
             }
 
             const playerId =
@@ -592,92 +470,48 @@ app.post(
                 `player_${crypto.randomBytes(12).toString("hex")}`;
 
             const newPlayer = {
-
                 playerId,
-
                 name,
-
                 usernameKey,
-
                 balance: 500,
-
                 totalRevenue: 0,
-
                 taxDue: 0,
-
                 rating: 4.8,
-
                 level: 1,
-
                 xp: 0,
-
                 maxXp: 100,
-
                 maxFleetSize: 3,
-
                 officeLevel: 1,
-
                 hasBoxUpgrade: false,
-
                 riders: [],
-
                 updatedAt: new Date()
-
             };
 
             try {
-
-                await playersCollection.insertOne(
-                    newPlayer
-                );
-
+                await playersCollection.insertOne(newPlayer);
             } catch (insertError) {
 
-                if (
-                    insertError &&
-                    insertError.code === 11000
-                ) {
-
+                if (insertError && insertError.code === 11000) {
                     return res.status(409).json({
-
                         success: false,
-
-                        error:
-                            "اسم المستخدم مستخدم بالفعل. اختار اسم تاني."
-
+                        error: "اسم المستخدم مستخدم بالفعل. اختار اسم تاني."
                     });
-
                 }
 
                 throw insertError;
             }
 
-            const players =
-                await getAllPlayers();
+            const players = await getAllPlayers();
 
-            io.emit(
-                "leaderboard:update",
-                players
-            );
-
-            io.emit(
-                "player:update",
-                newPlayer
-            );
+            io.emit("leaderboard:update", players);
+            io.emit("player:update", newPlayer);
 
             return res.json({
-
                 success: true,
-
                 isAdmin: false,
-
                 playerId,
-
                 name,
-
-                player:
-                    newPlayer
-
+                player: newPlayer
             });
 
         } catch (error) {
@@ -687,21 +521,14 @@ app.post(
                 error
             );
 
-            res.status(500).json({
-
+            return res.status(500).json({
                 success: false,
-
-                error:
-                    "حدث خطأ أثناء تسجيل الدخول."
-
+                error: "حدث خطأ أثناء تسجيل الدخول."
             });
-
         }
-
     }
 );
 
-// =========================
 // LOGOUT
 // =========================
 
