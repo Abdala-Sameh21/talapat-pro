@@ -82,7 +82,7 @@
                 <h2 class="text-xl font-black text-white mb-1">تسجيل مدير الشركة</h2>
                 <p class="text-[10px] text-gray-400 mb-4">اكتب اسمك للبدء في حفظ إنجازاتك</p>
                 <input type="text" id="usernameInput" class="w-full bg-slate-900 border border-slate-700 text-white text-center text-sm py-3 px-4 rounded-xl outline-none focus:border-orange-500 mb-2 transition" placeholder="اسم المدير العام" maxlength="15" autocomplete="username">
-                <input type="password" id="passwordInput" class="w-full bg-slate-900 border border-slate-700 text-white text-center text-sm py-3 px-4 rounded-xl outline-none focus:border-orange-500 mb-4 transition" placeholder="كلمة المرور (للأدمن فقط)" autocomplete="current-password">
+                <input type="password" id="passwordInput" class="w-full bg-slate-900 border border-slate-700 text-white text-center text-sm py-3 px-4 rounded-xl outline-none focus:border-orange-500 mb-4 transition" placeholder="كلمة المرور (للأدمن فقط)" autocomplete="current-password" style="display:none;">
                 <button id="loginBtn" type="button" class="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 font-black py-3 rounded-xl shadow-lg text-sm cursor-pointer">بدء اللعبة 🌍</button>
             </div>
         </div>
@@ -313,10 +313,23 @@
                 }
             });
 
+            const usernameInput = document.getElementById('usernameInput');
+            const passwordInput = document.getElementById('passwordInput');
+
+            // خانة الباسورد تظهر فقط عند كتابة اسم الأدمن.
+            usernameInput.addEventListener('input', () => {
+                const isAdminName = usernameInput.value.trim() === 'Boda';
+                passwordInput.style.display = isAdminName ? 'block' : 'none';
+                if (!isAdminName) passwordInput.value = '';
+            });
+
             document.getElementById('loginBtn').addEventListener('click', async () => {
-                const input = document.getElementById('usernameInput').value.trim();
-                const password = document.getElementById('passwordInput')?.value || '';
+                const input = usernameInput.value.trim();
+                const isAdminName = input === 'Boda';
+                const password = isAdminName ? passwordInput.value : '';
+
                 if (!input) return alert('اكتب اسم المستخدم أولاً.');
+                if (isAdminName && !password) return alert('اكتب كلمة مرور الأدمن.');
 
                 try {
                     const response = await fetch('/api/auth/login', {
