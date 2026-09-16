@@ -636,95 +636,189 @@
         }
 
         function startMainGame() {
-            fetch('/api/broadcast').then(r => r.json()).then(d => { if (d.text) showBroadcast(d.text, d.expiresAt); }).catch(() => {});
-            logMsg(`🚀 جاري رصد إحداثيات GPS وسحب المحلات والشوارع المحيطة...`);
-            
+            fetch('/api/broadcast')
+                .then(r => r.json())
+                .then(d => { if (d.text) showBroadcast(d.text, d.expiresAt); })
+                .catch(() => {});
+
+            logMsg(`🚀 جاري تحديد موقعك وسحب المحلات والشوارع الحقيقية حولك...`);
+
             let gpsResolved = false;
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        if (!gpsResolved) {
-                            gpsResolved = true;
-                            userLat = position.coords.latitude;
-                            userLng = position.coords.longitude;
-                            document.getElementById('cityNameDisplay').innerText = "📍 موقعك (GPS مباشر)";
-                            initMap(userLat, userLng);
-                            fetchLiveLocationData(userLat, userLng);
-                        }
-                    },
-                    (error) => {
-                        if (!gpsResolved) {
-                            gpsResolved = true;
-                            initMap(userLat, userLng);
-                            loadFallbackData(userLat, userLng);
-                        }
-                    },
-                    { enableHighAccuracy: false, timeout: 3000, maximumAge: 10000 }
-                );
+
+            if (!navigator.geolocation) {
+                logMsg(`⚠️ المتصفح لا يدعم تحديد الموقع، سيتم استخدام البيانات الافتراضية.`);
+                initMap(userLat, userLng);
+                loadFallbackData(userLat, userLng);
+                return;
             }
 
-            setTimeout(() => {
-                if (!gpsResolved) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    if (gpsResolved) return;
+
+                    gpsResolved = true;
+                    userLat = position.coords.latitude;
+                    userLng = position.coords.longitude;
+
+                    document.getElementById('cityNameDisplay').innerText = "📍 موقعك (GPS مباشر)";
+                    initMap(userLat, userLng);
+
+                    logMsg(`📍 تم تحديد موقعك بدقة، جاري جلب الشوارع والمحلات القريبة...`);
+                    fetchLiveLocationData(userLat, userLng);
+                },
+                (error) => {
+                    if (gpsResolved) return;
+
                     gpsResolved = true;
                     initMap(userLat, userLng);
+
+                    let msg = "تعذر تحديد موقعك";
+                    if (error && error.code === 1) msg = "تم رفض إذن الموقع";
+                    else if (error && error.code === 2) msg = "تعذر الحصول على الموقع";
+                    else if (error && error.code === 3) msg = "انتهت مهلة تحديد الموقع";
+
+                    logMsg(`⚠️ ${msg}. سيتم استخدام البيانات الافتراضية.`);
                     loadFallbackData(userLat, userLng);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 15000,
+                    maximumAge: 0
                 }
-            }, 1500);
+            );
         }
 
-        function fetchLiveLocationData(lat, lng) {
-            const query = `[out:json][timeout:6];(
-                node["amenity"="restaurant"](around:3500,${lat},${lng});
-                node["amenity"="fast_food"](around:3500,${lat},${lng});
-                node["amenity"="cafe"](around:3500,${lat},${lng});
-                way["highway"](around:2000,${lat},${lng});
-            );out body;`;
-            const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
+        async function fetchLiveLocationData(lat, lng) {
+            // أكثر من خادم Overpass حتى لا تفشل اللعبة لو الخادم الأول مشغول.
+            const endpoints = [
+                'https://overpass-api.de/api/interpreter',
+                'https://overpass.kumi.systems/api/interpreter',
+                'https://overpass.private.coffee/api/interpreter'
+            ];
 
-            fetch(url)
-                .then(res => res.json())
-                .then(data => {
-                    if (data && data.elements) {
-                        restaurants = [];
-                        streetsList = [];
+            // نطلب الـnode والـway معاً؛ كثير من المحلات والمطاعم في OSM
+            // تكون مسجلة كـway وليس node. center يعطينا إحداثيات الـway.
+            const query = `[out:json][timeout:15];(
+                nwr["amenity"~"restaurant|fast_food|cafe"](around:3500,${lat},${lng});
+                nwr["shop"~"bakery|confectionery|butcher|supermarket"](around:3500,${lat},${lng});
+                way["highway"](around:3000,${lat},${lng});
+            );out center tags;`;
 
-                        data.elements.forEach(el => {
-                            let name = el.tags && (el.tags.name || el.tags['name:ar'] || el.tags['name:en']);
-                            if (name) {
-                                if (el.tags.amenity) {
-                                    restaurants.push({
-                                        id: el.id,
-                                        name: name,
-                                        item: foodItemsList[Math.floor(Math.random() * foodItemsList.length)],
-                                        price: Math.floor(Math.random() * 90) + 60,
-                                        contractType: null,
-                                        ordersLeft: 0,
-                                        icon: "🍔",
-                                        lat: el.lat || (el.bounds ? el.bounds.minlat : lat + (Math.random()-0.5)*0.01),
-                                        lng: el.lon || (el.bounds ? el.bounds.minlon : lng + (Math.random()-0.5)*0.01)
-                                    });
-                                } else if (el.tags.highway) {
-                                    if (!streetsList.includes(name)) {
-                                        streetsList.push(name);
-                                    }
-                                }
-                            }
-                        });
+            logMsg(`🌐 جاري الاتصال ببيانات الخرائط الحقيقية...`);
 
-                        if (restaurants.length === 0 || streetsList.length === 0) {
-                            loadFallbackData(lat, lng);
-                        } else {
-                            logMsg(`✅ تم رصد ${restaurants.length} مطعم و ${streetsList.length} شارع حقيقي في منطقتك!`);
-                            updateRestaurantBadge();
-                            addRestaurantMarkersToMap();
+            let data = null;
+            let lastError = null;
+
+            for (const endpoint of endpoints) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 18000);
+
+                    const response = await fetch(
+                        endpoint + '?data=' + encodeURIComponent(query),
+                        {
+                            method: 'GET',
+                            signal: controller.signal,
+                            cache: 'no-store'
                         }
-                    } else {
-                        loadFallbackData(lat, lng);
+                    );
+
+                    clearTimeout(timeoutId);
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
                     }
-                })
-                .catch(err => {
-                    loadFallbackData(lat, lng);
-                });
+
+                    const result = await response.json();
+
+                    if (result && Array.isArray(result.elements)) {
+                        data = result;
+                        break;
+                    }
+
+                    throw new Error('بيانات غير صالحة من الخادم');
+                } catch (err) {
+                    lastError = err;
+                }
+            }
+
+            if (!data) {
+                console.error("Overpass error:", lastError);
+                logMsg(`⚠️ تعذر تحميل بيانات المنطقة الحقيقية. سيتم استخدام البيانات الافتراضية.`);
+                loadFallbackData(lat, lng);
+                return;
+            }
+
+            const liveRestaurants = [];
+            const liveStreets = [];
+            const restaurantIds = new Set();
+
+            data.elements.forEach(el => {
+                const tags = el.tags || {};
+                const name = tags.name || tags['name:ar'] || tags['name:en'];
+
+                if (!name) return;
+
+                // المطاعم والكافيهات والمحلات الغذائية
+                const isFoodPlace =
+                    !!tags.amenity ||
+                    tags.shop === 'bakery' ||
+                    tags.shop === 'confectionery' ||
+                    tags.shop === 'butcher' ||
+                    tags.shop === 'supermarket';
+
+                if (isFoodPlace) {
+                    const id = `${el.type}/${el.id}`;
+                    if (restaurantIds.has(id)) return;
+
+                    const elLat =
+                        typeof el.lat === 'number' ? el.lat :
+                        el.center && typeof el.center.lat === 'number' ? el.center.lat :
+                        null;
+
+                    const elLng =
+                        typeof el.lon === 'number' ? el.lon :
+                        el.center && typeof el.center.lon === 'number' ? el.center.lon :
+                        null;
+
+                    if (elLat === null || elLng === null) return;
+
+                    restaurantIds.add(id);
+
+                    liveRestaurants.push({
+                        id: el.id,
+                        name: name,
+                        item: foodItemsList[Math.floor(Math.random() * foodItemsList.length)],
+                        price: Math.floor(Math.random() * 90) + 60,
+                        contractType: null,
+                        ordersLeft: 0,
+                        icon: tags.amenity === 'cafe' ? "☕" : "🍔",
+                        lat: elLat,
+                        lng: elLng
+                    });
+                }
+
+                // الشوارع الحقيقية
+                if (tags.highway) {
+                    if (!liveStreets.includes(name)) {
+                        liveStreets.push(name);
+                    }
+                }
+            });
+
+            // لو البيانات رجعت لكن بدون مطاعم/شوارع، لا نستبدل جزء ناجح
+            // ببيانات وهمية. نستخدم الافتراضي فقط لو فشل الطلب نفسه.
+            restaurants = liveRestaurants;
+            streetsList = liveStreets;
+
+            if (restaurants.length > 0 || streetsList.length > 0) {
+                logMsg(`✅ تم رصد ${restaurants.length} محل/مطعم و ${streetsList.length} شارع حقيقي في منطقتك!`);
+                updateRestaurantBadge();
+                addRestaurantMarkersToMap();
+            } else {
+                logMsg(`ℹ️ لم يتم العثور على أماكن مسجلة في الخرائط حول موقعك حالياً.`);
+                updateRestaurantBadge();
+            }
         }
 
         function loadFallbackData(lat, lng) {
@@ -737,7 +831,7 @@
                 { id: 6, name: "كبدة المحطة", item: "طبق كبدة اسكندراني", price: 55, contractType: null, ordersLeft: 0, icon: "🥩", lat: lat - 0.002, lng: lng - 0.005 }
             ];
             streetsList = ["شارع المحطة الرئيسي", "شارع التجارة", "شارع الوحدة", "شارع النيل", "شارع الجمهورية"];
-            logMsg(`✅ تم تحميل المحلات والشوارع الافتراضية بنجاح.`);
+            logMsg(`✅ تم تحميل المحلات والشوارع الافتراضية.`);
             updateRestaurantBadge();
             addRestaurantMarkersToMap();
         }
