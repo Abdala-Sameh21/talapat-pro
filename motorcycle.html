@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>التوصيل بالموتوسيكل 🏍️</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#08111d;color:#fff;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button{font:inherit;border:0;cursor:pointer}
+#app{height:100%;display:flex;flex-direction:column;background:
+ radial-gradient(circle at 50% 20%,rgba(30,90,125,.22),transparent 35%),
+ #08111d}
+.top{height:72px;flex:0 0 72px;display:flex;align-items:center;gap:8px;padding:8px 10px;padding-top:max(8px,env(safe-area-inset-top));background:rgba(5,13,23,.92);border-bottom:1px solid rgba(255,255,255,.09);z-index:20}
+.back{width:42px;height:42px;border-radius:14px;background:#142437;color:#fff;font-size:22px}
+.player{min-width:0;flex:1;text-align:right}
+.name{font-weight:900;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{font-size:10px;color:#8fa4b9;margin-top:2px}
+.money{padding:9px 11px;border-radius:14px;background:rgba(20,38,55,.9);font-weight:900;color:#ffd86b;font-size:13px;white-space:nowrap}
+.shop{height:42px;padding:0 12px;border-radius:14px;background:#183047;color:#8de8ff;font-weight:900;font-size:11px}
+#game{position:relative;flex:1;min-height:0;overflow:hidden;background:#17221b}
+canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+.hud{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:8px;pointer-events:none;z-index:5}
+.card{background:rgba(4,12,20,.78);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:8px 10px;min-width:86px}
+.card small{display:block;color:#8297a9;font-size:9px}
+.card b{display:block;font-size:13px;margin-top:2px}
+.order{position:absolute;top:72px;left:50%;transform:translateX(-50%);width:min(92%,390px);background:rgba(4,12,20,.9);border:1px solid rgba(75,220,255,.2);border-radius:16px;padding:10px 12px;z-index:6;display:none;box-shadow:0 12px 35px rgba(0,0,0,.3)}
+.order .title{font-weight:900;font-size:12px;color:#8de8ff}
+.order .desc{font-size:10px;color:#c1ced8;margin-top:4px}
+.order button{margin-top:8px;width:100%;height:34px;border-radius:11px;background:#1fd18b;color:#04130e;font-weight:1000;font-size:11px}
+.tip{position:absolute;bottom:116px;left:50%;transform:translateX(-50%);z-index:7;background:rgba(3,9,15,.72);border:1px solid rgba(255,255,255,.1);border-radius:13px;padding:7px 11px;font-size:10px;color:#b8c7d3;white-space:nowrap}
+.controls{position:absolute;bottom:14px;left:12px;right:12px;height:96px;z-index:8;pointer-events:none}
+.pad{position:absolute;left:0;bottom:0;width:96px;height:96px;pointer-events:auto}
+.ctrl{position:absolute;width:42px;height:42px;border-radius:13px;background:rgba(7,17,27,.82);border:1px solid rgba(255,255,255,.13);color:#fff;font-size:18px;font-weight:900;box-shadow:0 5px 18px rgba(0,0,0,.25)}
+.up{left:27px;top:0}.down{left:27px;bottom:0}.left{left:0;top:27px}.right{right:0;top:27px}
+.action{position:absolute;right:0;bottom:0;width:84px;height:84px;border-radius:50%;pointer-events:auto;background:linear-gradient(145deg,#1fd18b,#0ca66c);color:#03150e;border:4px solid rgba(255,255,255,.14);font-weight:1000;font-size:12px;box-shadow:0 8px 28px rgba(0,0,0,.35)}
+.action:active,.ctrl:active,.shop:active,.back:active{transform:scale(.96)}
+.overlay{position:absolute;inset:0;background:rgba(1,6,11,.8);backdrop-filter:blur(7px);z-index:30;display:none;align-items:center;justify-content:center;padding:18px}
+.modal{width:min(94%,430px);max-height:88%;overflow:auto;background:#0d1a29;border:1px solid rgba(255,255,255,.1);border-radius:22px;padding:16px;box-shadow:0 20px 70px #000}
+.modal h2{font-size:17px;margin:0 0 12px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#122337;border:1px solid rgba(255,255,255,.07);border-radius:15px;padding:11px;margin:8px 0}
+.row b{font-size:12px}.row span{display:block;color:#91a5b8;font-size:9px;margin-top:3px}
+.buy{background:#20d18a;color:#03150e;padding:8px 11px;border-radius:11px;font-weight:1000;font-size:10px;white-space:nowrap}
+.buy:disabled{background:#33485a;color:#81909d;cursor:not-allowed}
+.close{width:100%;height:40px;border-radius:12px;background:#1a2b3d;color:#fff;font-weight:900;margin-top:10px}
+.msg{font-size:11px;color:#aebdca;line-height:1.7;text-align:center;padding:12px}
+.marker{position:absolute;z-index:4;pointer-events:none;font-size:24px;filter:drop-shadow(0 3px 4px rgba(0,0,0,.5))}
+#toast{position:absolute;top:14px;left:50%;transform:translateX(-50%) translateY(-15px);opacity:0;z-index:50;background:#1fd18b;color:#04130e;font-weight:1000;font-size:11px;padding:9px 14px;border-radius:12px;transition:.25s;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(max-width:420px){.shop{padding:0 9px}.money{padding:8px 8px;font-size:11px}.top{gap:6px}.tip{bottom:108px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <button class="back" id="backBtn">‹</button>
+    <div class="player">
+      <div class="name" id="playerName">اللاعب</div>
+      <div class="meta">مستوى <span id="level">1</span> • توصيلات ناجحة <span id="count">0</span></div>
+    </div>
+    <div class="money">💰 <span id="balance">0</span>ج</div>
+    <button class="shop" id="shopBtn">🏍️ المتجر</button>
+  </header>
+
+  <main id="game">
+    <canvas id="canvas"></canvas>
+    <div class="hud">
+      <div class="card"><small>الأوردر</small><b id="status">ابحث عن أوردر</b></div>
+      <div class="card"><small>المكافأة</small><b id="reward">—</b></div>
+      <div class="card"><small>سرعة الموتوسيكل</small><b id="speed">1x</b></div>
+    </div>
+
+    <div class="order" id="orderBox">
+      <div class="title" id="orderTitle">📦 أوردر جديد</div>
+      <div class="desc" id="orderDesc">اذهب لنقطة الاستلام.</div>
+      <button id="acceptBtn">قبول الأوردر</button>
+    </div>
+
+    <div class="tip">حرّك الموتوسيكل بالأسهم أو أزرار الشاشة • اذهب للعلامة ثم اضغط «تسليم»</div>
+
+    <div class="controls">
+      <div class="pad">
+        <button class="ctrl up" data-key="up">▲</button>
+        <button class="ctrl down" data-key="down">▼</button>
+        <button class="ctrl left" data-key="left">◀</button>
+        <button class="ctrl right" data-key="right">▶</button>
+      </div>
+      <button class="action" id="actionBtn">استلام<br>الأوردر</button>
+    </div>
+
+    <div id="toast"></div>
+
+    <div class="overlay" id="shopOverlay">
+      <div class="modal">
+        <h2>🏍️ متجر الموتوسيكلات</h2>
+        <div class="msg">الشراء والتطوير محفوظان محليًا على نفس الحساب. كل مكافآت التوصيل تدخل مباشرة في رصيد اللعبة الرئيسي.</div>
+        <div id="bikes"></div>
+        <button class="close" id="closeShop">إغلاق</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="loadingOverlay">
+      <div class="modal">
+        <h2>جاري تحميل حسابك…</h2>
+        <div class="msg" id="loadingMsg">بنجيب رصيدك وبيانات حسابك من السيرفر.</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const API = {
+    player: id => "/api/players/id/" + encodeURIComponent(id),
+    save: "/api/players"
+  };
+
+  const playerId = localStorage.getItem("game_player_id");
+  const username = localStorage.getItem("game_username");
+
+  if (!playerId) {
+    // لا ننشئ حسابًا جديدًا هنا حتى لا يتفصل رصيد الموتوسيكل عن الحساب الرئيسي.
+    location.href = "index.html";
+    return;
+  }
+
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  const $ = id => document.getElementById(id);
+
+  let W = 0, H = 0;
+  let player = {
+    playerId,
+    name: username || "اللاعب",
+    balance: 0,
+    totalRevenue: 0,
+    taxDue: 0,
+    rating: 4.8,
+    level: 1,
+    xp: 0,
+    maxXp: 100,
+    maxFleetSize: 3,
+    officeLevel: 1,
+    hasBoxUpgrade: false,
+    riders: [],
+    missionsProgress: {}
+  };
+
+  const bikes = [
+    {id:"basic", name:"الموتوسيكل الأساسي", speed:2.6, price:0, icon:"🏍️"},
+    {id:"sport", name:"Sport 150", speed:3.6, price:1500, icon:"🏍️"},
+    {id:"turbo", name:"Turbo 250", speed:4.8, price:4500, icon:"🏍️"},
+    {id:"pro", name:"Delivery Pro", speed:6.1, price:9000, icon:"🏍️"}
+  ];
+
+  let ownedBike = localStorage.getItem("motorcycle_owned_bike") || "basic";
+  let deliveries = Number(localStorage.getItem("motorcycle_deliveries") || 0);
+  let activeOrder = null;
+  let accepted = false;
+  let state = "idle";
+  let reward = 0;
+  let lastTime = 0;
+  let toastTimer = null;
+
+  const bike = () => bikes.find(x => x.id === ownedBike) || bikes[0];
+
+  const rider = {
+    x: .5, y: .55, angle: 0,
+    keys: {up:false,down:false,left:false,right:false}
+  };
+
+  function resize(){
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    canvas.width = Math.floor(W*dpr); canvas.height = Math.floor(H*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener("resize", resize);
+
+  function toast(text, bad=false){
+    const t = $("toast");
+    t.textContent = text;
+    t.style.background = bad ? "#ff6875" : "#1fd18b";
+    t.style.color = bad ? "#220308" : "#04130e";
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>t.classList.remove("show"),2200);
+  }
+
+  function money(n){ return Math.max(0, Math.round(Number(n)||0)).toLocaleString("ar-EG"); }
+
+  async function loadPlayer(){
+    $("loadingOverlay").style.display = "flex";
+    try{
+      const r = await fetch(API.player(playerId), {cache:"no-store"});
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const d = await r.json();
+      player = {
+        ...player,
+        ...d,
+        playerId: d.playerId || playerId,
+        balance: Number(d.balance ?? 0),
+        totalRevenue: Number(d.totalRevenue ?? 0),
+        level: Number(d.level ?? 1),
+        xp: Number(d.xp ?? 0),
+        maxXp: Number(d.maxXp ?? 100),
+        missionsProgress: d.missionsProgress || {}
+      };
+      if(d.name) localStorage.setItem("game_username", d.name);
+      renderHeader();
+      $("loadingOverlay").style.display = "none";
+      startGame();
+    }catch(e){
+      $("loadingMsg").textContent = "تعذر تحميل بيانات الحساب من السيرفر. تأكد أن السيرفر شغال ثم أعد المحاولة.";
+      toast("تعذر تحميل رصيد الحساب", true);
+      console.error(e);
+    }
+  }
+
+  function payload(){
+    return {
+      playerId: player.playerId,
+      name: player.name || localStorage.getItem("game_username") || "اللاعب",
+      balance: Number(player.balance || 0),
+      totalRevenue: Number(player.totalRevenue || 0),
+      taxDue: Number(player.taxDue || 0),
+      rating: Number(player.rating ?? 4.8),
+      level: Number(player.level || 1),
+      xp: Number(player.xp || 0),
+      maxXp: Number(player.maxXp || 100),
+      maxFleetSize: Number(player.maxFleetSize || 3),
+      officeLevel: Number(player.officeLevel || 1),
+      hasBoxUpgrade: Boolean(player.hasBoxUpgrade),
+      riders: Array.isArray(player.riders) ? player.riders : [],
+      missionsProgress: player.missionsProgress || {}
+    };
+  }
+
+  async function savePlayer(){
+    const r = await fetch(API.save,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload())
+    });
+    if(!r.ok) throw new Error("save "+r.status);
+    const d = await r.json();
+    if(d.player) player = {...player,...d.player};
+    renderHeader();
+  }
+
+  function renderHeader(){
+    $("playerName").textContent = player.name || localStorage.getItem("game_username") || "اللاعب";
+    $("balance").textContent = money(player.balance);
+    $("level").textContent = player.level || 1;
+    $("count").textContent = deliveries;
+    $("speed").textContent = (bike().speed / 2.6).toFixed(1) + "x";
+  }
+
+  function randomOrder(){
+    const pickup = {x:.20 + Math.random()*.60, y:.22 + Math.random()*.48};
+    let drop = {x:.20 + Math.random()*.60, y:.22 + Math.random()*.48};
+    if(Math.hypot(drop.x-pickup.x,drop.y-pickup.y)<.28){
+      drop = {x:.78-pickup.x*.35,y:.78-pickup.y*.25};
+    }
+    reward = 120 + Math.floor(Math.random()*181);
+    activeOrder = {pickup,drop,reward};
+    accepted = false;
+    state = "offer";
+    $("orderTitle").textContent = "📦 أوردر جديد";
+    $("orderDesc").textContent = "مكافأة " + money(reward) + "ج • اقبل ثم اذهب لنقطة الاستلام.";
+    $("acceptBtn").style.display = "block";
+    $("orderBox").style.display = "block";
+    $("status").textContent = "أوردر جديد";
+    $("reward").textContent = money(reward)+"ج";
+    $("actionBtn").innerHTML = "قبول<br>الأوردر";
+  }
+
+  function acceptOrder(){
+    if(!activeOrder || accepted) return;
+    accepted = true;
+    state = "pickup";
+    $("orderBox").style.display = "none";
+    $("status").textContent = "اذهب للاستلام";
+    $("actionBtn").innerHTML = "استلام<br>الأوردر";
+    toast("الأوردر اتقبل! روح للعلامة 📍");
+  }
+
+  function distanceTo(p){
+    return Math.hypot(rider.x-p.x,rider.y-p.y);
+  }
+
+  async function action(){
+    if(state === "offer"){ acceptOrder(); return; }
+    if(!activeOrder) return;
+
+    if(state === "pickup"){
+      if(distanceTo(activeOrder.pickup) > .09){
+        toast("قرب من نقطة الاستلام 📍", true); return;
+      }
+      state = "delivery";
+      $("status").textContent = "اذهب للعميل";
+      $("actionBtn").innerHTML = "تسليم<br>الأوردر";
+      toast("استلمت الأوردر! اتجه للعميل 🏁");
+      return;
+    }
+
+    if(state === "delivery"){
+      if(distanceTo(activeOrder.drop) > .10){
+        toast("لسه بعيد عن العميل 📍", true); return;
+      }
+      await completeDelivery();
+    }
+  }
+
+  async function completeDelivery(){
+    const earned = reward;
+    // إعادة جلب آخر رصيد قبل إضافة المكافأة لتقليل احتمال الكتابة فوق تعديل حصل في اللعبة الرئيسية.
+    try{
+      const r = await fetch(API.player(playerId),{cache:"no-store"});
+      if(r.ok){
+        const fresh = await r.json();
+        player = {...player,...fresh,
+          balance:Number(fresh.balance ?? player.balance),
+          totalRevenue:Number(fresh.totalRevenue ?? player.totalRevenue),
+          missionsProgress:fresh.missionsProgress || player.missionsProgress || {}
+        };
+      }
+    }catch(e){ console.warn("refresh before reward failed",e); }
+
+    player.balance = Number(player.balance||0) + earned;
+    player.totalRevenue = Number(player.totalRevenue||0) + earned;
+
+    const xpGain = 10;
+    player.xp = Number(player.xp||0) + xpGain;
+    while(player.xp >= Number(player.maxXp||100)){
+      player.xp -= Number(player.maxXp||100);
+      player.level = Number(player.level||1) + 1;
+      player.maxXp = Math.round(Number(player.maxXp||100) * 1.18);
+    }
+
+    // تقدم مهام التوصيل الموجودة في اللعبة الرئيسية.
+    const mp = player.missionsProgress || {};
+    for(const [id,v] of Object.entries(mp)){
+      if(v && !v.claimed) v.progress = Number(v.progress||0) + 1;
+    }
+    player.missionsProgress = mp;
+
+    try{
+      await savePlayer();
+      deliveries++;
+      localStorage.setItem("motorcycle_deliveries", String(deliveries));
+      renderHeader();
+      toast("تم التسليم! +" + money(earned) + "ج أضيفت لرصيد اللعبة الرئيسي ✅");
+    }catch(e){
+      // لا نعتبر الأوردر منتهيًا إذا فشل الحفظ.
+      toast("المكافأة لم تُحفظ. جرّب مرة أخرى.", true);
+      console.error(e);
+      return;
+    }
+
+    activeOrder = null;
+    accepted = false;
+    state = "idle";
+    $("status").textContent = "ابحث عن أوردر";
+    $("reward").textContent = "—";
+    $("actionBtn").innerHTML = "ابحث عن<br>أوردر";
+    setTimeout(randomOrder, 1200);
+  }
+
+  function openShop(){
+    const box = $("bikes");
+    box.innerHTML = "";
+    for(const b of bikes){
+      const owned = bikes.findIndex(x=>x.id===ownedBike) >= bikes.findIndex(x=>x.id===b.id);
+      const isCurrent = ownedBike===b.id;
+      const row = document.createElement("div");
+      row.className="row";
+      row.innerHTML = `
+        <div><b>${b.icon} ${b.name}</b><span>السرعة: ${(b.speed/2.6).toFixed(1)}x ${isCurrent?"• مستخدم حاليًا":""}</span></div>
+        <button class="buy" ${owned?"":""}>${isCurrent?"مستخدم":owned?"اختيار":"شراء • "+money(b.price)+"ج"}</button>
+      `;
+      const btn=row.querySelector("button");
+      btn.disabled=isCurrent;
+      btn.addEventListener("click", async()=>{
+        if(owned){
+          ownedBike=b.id;
+          localStorage.setItem("motorcycle_owned_bike",ownedBike);
+          renderHeader(); openShop(); toast("تم اختيار "+b.name);
+          return;
+        }
+        if(player.balance < b.price){ toast("رصيدك لا يكفي لشراء الموتوسيكل",true); return; }
+        player.balance -= b.price;
+        try{
+          await savePlayer();
+          ownedBike=b.id;
+          localStorage.setItem("motorcycle_owned_bike",ownedBike);
+          renderHeader(); openShop(); toast("تم شراء "+b.name+" 🏍️");
+        }catch(e){
+          player.balance += b.price;
+          renderHeader();
+          toast("تعذر حفظ عملية الشراء",true);
+        }
+      });
+      box.appendChild(row);
+    }
+    $("shopOverlay").style.display="flex";
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+
+    // أرضية
+    ctx.fillStyle="#243126"; ctx.fillRect(0,0,W,H);
+
+    // شبكة مدينة
+    const roadW=Math.max(46,Math.min(74,W*.13));
+    ctx.fillStyle="#30383a";
+    for(let x=roadW/2;x<W;x+=roadW*2.05) ctx.fillRect(x-roadW/2,0,roadW,H);
+    for(let y=roadW/2;y<H;y+=roadW*2.05) ctx.fillRect(0,y-roadW/2,W,roadW);
+
+    // مباني
+    ctx.fillStyle="#1b2821";
+    for(let x=8;x<W;x+=roadW*2.05){
+      for(let y=8;y<H;y+=roadW*2.05){
+        const bw=roadW*1.55,bh=roadW*1.55;
+        ctx.fillRect(x,y,bw,bh);
+        ctx.fillStyle="#26372d";
+        ctx.fillRect(x+8,y+8,bw-16,bh-16);
+        ctx.fillStyle="#1b2821";
+      }
+    }
+
+    // خطوط الطرق
+    ctx.strokeStyle="rgba(240,210,110,.22)"; ctx.lineWidth=2; ctx.setLineDash([10,10]);
+    for(let x=roadW/2;x<W;x+=roadW*2.05){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+    for(let y=roadW/2;y<H;y+=roadW*2.05){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+    ctx.setLineDash([]);
+
+    // نقاط الأوردر
+    if(activeOrder){
+      const p=state==="pickup"?activeOrder.pickup:activeOrder.drop;
+      const px=p.x*W,py=p.y*H;
+      ctx.beginPath();ctx.arc(px,py,18+Math.sin(Date.now()/180)*3,0,Math.PI*2);
+      ctx.fillStyle=state==="pickup"?"rgba(53,205,255,.22)":"rgba(31,209,139,.22)";ctx.fill();
+      ctx.font="25px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillText(state==="pickup"?"📦":"🏠",px,py);
+    }
+
+    // اللاعب
+    const px=rider.x*W,py=rider.y*H;
+    ctx.save();ctx.translate(px,py);ctx.rotate(rider.angle);
+    ctx.font="34px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.shadowColor="rgba(0,0,0,.55)";ctx.shadowBlur=8;ctx.fillText("🏍️",0,0);ctx.restore();
+
+    // اتجاه المسافة
+    if(activeOrder && state!=="offer"){
+      const target=state==="pickup"?activeOrder.pickup:activeOrder.drop;
+      const dx=target.x-rider.x,dy=target.y-rider.y;
+      const d=Math.hypot(dx,dy);
+      ctx.fillStyle="rgba(255,255,255,.8)";ctx.font="bold 11px system-ui";ctx.textAlign="center";
+      ctx.fillText("المسافة "+Math.round(d*100)+"م",W/2,H-122);
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  function move(dt){
+    let dx=(rider.keys.right?1:0)-(rider.keys.left?1:0);
+    let dy=(rider.keys.down?1:0)-(rider.keys.up?1:0);
+    if(!dx && !dy)return;
+    const len=Math.hypot(dx,dy);dx/=len;dy/=len;
+    const s=bike().speed*dt/1000*.001;
+    rider.x=Math.max(.04,Math.min(.96,rider.x+dx*s));
+    rider.y=Math.max(.08,Math.min(.92,rider.y+dy*s));
+    rider.angle=Math.atan2(dy,dx)+Math.PI/2;
+  }
+
+  function loop(t){
+    const dt=Math.min(40,t-lastTime||16);lastTime=t;
+    move(dt); requestAnimationFrame(loop);
+  }
+
+  function bindControls(){
+    const keyMap={ArrowUp:"up",w:"up",W:"up",ArrowDown:"down",s:"down",S:"down",ArrowLeft:"left",a:"left",A:"left",ArrowRight:"right",d:"right",D:"right"};
+    window.addEventListener("keydown",e=>{
+      const k=keyMap[e.key];
+      if(k){rider.keys[k]=true;e.preventDefault()}
+      if(e.key===" "){action();e.preventDefault()}
+    });
+    window.addEventListener("keyup",e=>{const k=keyMap[e.key];if(k)rider.keys[k]=false});
+    document.querySelectorAll(".ctrl").forEach(btn=>{
+      const k=btn.dataset.key;
+      const on=e=>{e.preventDefault();rider.keys[k]=true};
+      const off=e=>{e.preventDefault();rider.keys[k]=false};
+      btn.addEventListener("pointerdown",on);btn.addEventListener("pointerup",off);
+      btn.addEventListener("pointercancel",off);btn.addEventListener("pointerleave",off);
+    });
+    $("actionBtn").addEventListener("click",action);
+    $("acceptBtn").addEventListener("click",acceptOrder);
+    $("shopBtn").addEventListener("click",openShop);
+    $("closeShop").addEventListener("click",()=>$("shopOverlay").style.display="none");
+    $("backBtn").addEventListener("click",()=>location.href="index.html");
+  }
+
+  function startGame(){
+    resize(); bindControls(); draw(); requestAnimationFrame(loop);
+    setTimeout(randomOrder,900);
+  }
+
+  renderHeader();
+  loadPlayer();
+})();
+</script>
+</body>
+</html>
