@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Motorcycle Delivery</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#071017;font-family:Arial,Tahoma,sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
+button{font:inherit;user-select:none;-webkit-user-select:none;touch-action:none}
+#game{position:fixed;inset:0;overflow:hidden;background:#0a151b}
+#world{position:absolute;inset:0;overflow:hidden}
+#worldBg{position:absolute;inset:0;background-image:url('motorcycle_assets/city_world.jpg');background-size:cover;background-position:center;will-change:transform}
+#shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.24),rgba(0,0,0,.06) 45%,rgba(0,0,0,.30));pointer-events:none}
+#laneGuard{position:absolute;left:0;right:0;top:47%;height:18%;border-top:2px solid rgba(40,245,190,.42);border-bottom:2px solid rgba(40,245,190,.42);background:rgba(16,190,170,.10);pointer-events:none}
+#traffic{position:absolute;inset:0;pointer-events:none}
+.traffic{position:absolute;width:clamp(86px,10vw,145px);height:auto;will-change:transform;filter:drop-shadow(0 7px 5px rgba(0,0,0,.4))}
+.traffic.top{top:34%;}.traffic.bottom{top:69%}
+#player{position:absolute;left:50%;top:56%;width:clamp(110px,13vw,175px);z-index:20;transform:translate(-50%,-50%);will-change:left,transform;filter:drop-shadow(0 10px 8px rgba(0,0,0,.55))}
+#player img{width:100%;display:block}
+#motion{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .1s;background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent)}
+#hud{position:absolute;inset:0;z-index:50;pointer-events:none}
+.panel{background:rgba(4,14,22,.88);border:2px solid rgba(247,193,35,.65);box-shadow:0 8px 28px rgba(0,0,0,.32);border-radius:18px;color:#fff}
+#profile{position:absolute;top:max(10px,env(safe-area-inset-top));left:12px;direction:rtl;padding:10px 16px;min-width:240px}
+#profile b{font-size:clamp(17px,2.2vw,28px)}
+#profile .sub{opacity:.75;margin-top:4px;font-size:13px}
+#balance{color:#3ce7ad;font-weight:800;font-size:18px}
+#order{position:absolute;top:max(10px,env(safe-area-inset-top));right:50%;transform:translateX(50%);padding:10px 22px;min-width:300px;text-align:center}
+#order .title{font-weight:900;font-size:clamp(18px,2.2vw,28px);color:#ffd044}
+#order .info{margin-top:4px;font-size:14px;opacity:.85}
+#mission{position:absolute;top:96px;right:14px;width:min(340px,32vw);padding:13px;direction:rtl}
+#mission .mTitle{font-weight:900;color:#6fe8ff;font-size:18px}
+#mission .mText{margin-top:6px;line-height:1.5;font-size:13px}
+#speedBox{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);width:clamp(150px,15vw,205px);height:clamp(150px,15vw,205px);border-radius:50%;background:radial-gradient(circle,#152631 0 55%,#071017 56% 69%,#29333b 70% 73%,#071017 74%);border:5px solid #313b42;display:grid;place-items:center;color:#fff;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+#speed{font-size:clamp(42px,5vw,72px);font-weight:900;line-height:.8}
+#km{font-size:15px;letter-spacing:1px}
+#speedBar{position:absolute;left:10%;right:10%;bottom:13%;height:7px;border-radius:9px;background:#17232b;overflow:hidden}
+#speedFill{height:100%;width:0;background:#28df9c;border-radius:9px}
+.control{position:absolute;bottom:22px;width:clamp(92px,9vw,135px);height:clamp(112px,11vw,150px);border-radius:24px;border:3px solid #f5bf24;background:rgba(3,14,21,.90);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:7px;box-shadow:0 10px 25px rgba(0,0,0,.4);pointer-events:auto}
+.control span{font-size:clamp(16px,2vw,25px)}
+.control .icon{font-size:clamp(34px,4vw,52px);line-height:1}
+#gas{right:18px;color:#ffd044}
+#brake{right:calc(clamp(92px,9vw,135px) + 38px)}
+#left,#right{bottom:25px;width:clamp(75px,8vw,110px);height:clamp(75px,8vw,110px);border-radius:50%;font-size:50px;z-index:55}
+#left{left:18px}#right{left:calc(18px + clamp(75px,8vw,110px) + 18px)}
+#accept{position:absolute;right:50%;top:52%;transform:translate(50%,-50%);z-index:70;min-width:240px;padding:16px 28px;border:2px solid #ffd044;border-radius:16px;background:#0a1720;color:#fff;font-weight:900;font-size:20px;pointer-events:auto}
+#toast{position:absolute;left:50%;top:18%;transform:translateX(-50%);padding:10px 16px;z-index:100;opacity:0;transition:.2s;pointer-events:none;white-space:nowrap}
+#shop{position:absolute;inset:0;background:rgba(0,0,0,.72);z-index:200;display:none;align-items:center;justify-content:center;padding:18px}
+.shopBox{width:min(760px,92vw);max-height:86vh;overflow:auto;padding:20px;border-radius:22px;background:#09151e;border:2px solid #f5bf24;color:#fff}
+.bikes{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.bike{padding:12px;border:1px solid #32404a;border-radius:15px;background:#101e28;text-align:center}
+.bike img{width:100%;height:75px;object-fit:contain}
+.bike button{width:100%;padding:9px;border:0;border-radius:10px;background:#f5bf24;color:#091017;font-weight:900}
+#closeShop{margin-top:14px;width:100%;padding:11px;border:1px solid #596771;border-radius:12px;background:#172630;color:#fff}
+@media (max-width:800px) and (orientation:portrait){
+  #game:before{content:"لف الموبايل بالعرض";position:absolute;inset:0;z-index:999;background:#071017;color:#fff;display:grid;place-items:center;font-size:24px;font-weight:900}
+}
+@media (max-width:900px){
+  #profile{min-width:190px;padding:8px 12px}
+  #mission{width:250px;top:82px}
+  #order{min-width:250px}
+  .bikes{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="world">
+    <div id="worldBg"></div>
+    <div id="laneGuard"></div>
+    <div id="traffic"></div>
+    <div id="player"><img src="motorcycle_assets/player_moto.png" draggable="false"></div>
+    <div id="motion"></div>
+  </div>
+
+  <div id="hud">
+    <div id="profile" class="panel">
+      <b id="playerName">لاعب</b>
+      <div class="sub">مستوى <span id="level">1</span> • توصيلات ناجحة <span id="deliveries">0</span></div>
+      <div id="balance">0 ج</div>
+    </div>
+
+    <div id="order" class="panel">
+      <div class="title" id="shopOpen" style="pointer-events:auto;cursor:pointer">🏍️ التوصيل بالموتوسيكل</div>
+      <div class="info">سرعة: <span id="speedTop">0</span> KM/H • مكافأة: <span id="reward">0</span> ج</div>
+    </div>
+
+    <div id="mission" class="panel">
+      <div class="mTitle">📦 أوردر التوصيل</div>
+      <div class="mText" id="missionText">اضغط قبول الأوردر ثم ابدأ القيادة.</div>
+    </div>
+
+    <button id="accept">قبول الأوردر</button>
+
+    <button class="control" id="brake"><div class="icon">▼▼</div><span>فرامل</span></button>
+    <button class="control" id="gas"><div class="icon">▲▲</div><span>بنزين</span></button>
+    <button class="control" id="left">‹</button>
+    <button class="control" id="right">›</button>
+
+    <div id="speedBox">
+      <div>
+        <div id="speed">0</div><div id="km">KM/H</div>
+      </div>
+      <div id="speedBar"><div id="speedFill"></div></div>
+    </div>
+
+    <div id="toast" class="panel"></div>
+  </div>
+
+  <div id="shop">
+    <div class="shopBox" dir="rtl">
+      <h2>🏍️ متجر الموتوسيكلات</h2>
+      <p>الشراء من نفس رصيد اللعبة الرئيسي.</p>
+      <div class="bikes">
+        <div class="bike"><b>Basic</b><img src="motorcycle_assets/player_moto.png"><small>سرعة 70</small><button data-bike="basic">مملوك</button></div>
+        <div class="bike"><b>Sport</b><img src="motorcycle_assets/player_moto.png"><small>سرعة 100</small><button data-bike="sport">1,500 ج</button></div>
+        <div class="bike"><b>Turbo</b><img src="motorcycle_assets/player_moto.png"><small>سرعة 130</small><button data-bike="turbo">4,500 ج</button></div>
+        <div class="bike"><b>Pro</b><img src="motorcycle_assets/player_moto.png"><small>سرعة 160</small><button data-bike="pro">9,000 ج</button></div>
+      </div>
+      <button id="closeShop">إغلاق المتجر</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PLAYER_ID = localStorage.getItem('game_player_id');
+if(!PLAYER_ID){ location.href='index.html'; }
+
+const state = {
+  player:{id:PLAYER_ID,name:localStorage.getItem('game_username')||'المدير',balance:0,totalRevenue:0,level:1,xp:0,maxXp:100},
+  accepted:false, phase:'offer', reward:0, distance:0,
+  speed:0, maxSpeed:70, gas:false, brake:false, steer:0, playerX:50,
+  deliveries:Number(localStorage.getItem('motorcycle_deliveries')||0),
+  bike:localStorage.getItem('motorcycle_owned_bike')||'basic',
+  traffic:[], nextSpawn:0, last:performance.now(), saveTimer:null
+};
+const bikes={basic:{max:70,acc:42},sport:{max:100,acc:52},turbo:{max:130,acc:64},pro:{max:160,acc:78}};
+state.maxSpeed=bikes[state.bike].max;
+
+const $=id=>document.getElementById(id);
+function money(n){return Math.max(0,Math.round(n)).toLocaleString('en-US')+' ج'}
+function ui(){
+  $('playerName').textContent=state.player.name;
+  $('level').textContent=state.player.level||1;
+  $('deliveries').textContent=state.deliveries;
+  $('balance').textContent=money(state.player.balance);
+  $('speed').textContent=Math.round(state.speed);
+  $('speedTop').textContent=Math.round(state.speed);
+  $('reward').textContent=money(state.reward).replace(' ج','');
+  $('speedFill').style.width=Math.min(100,state.speed/state.maxSpeed*100)+'%';
+}
+async function loadPlayer(){
+  try{
+    const r=await fetch('/api/players/id/'+encodeURIComponent(PLAYER_ID));
+    if(r.ok){
+      const p=await r.json();
+      state.player={...state.player,...p};
+      state.player.balance=Number(p.balance||0);
+      state.player.totalRevenue=Number(p.totalRevenue||0);
+      state.player.level=Number(p.level||1);
+      state.player.xp=Number(p.xp||0);
+      state.player.maxXp=Number(p.maxXp||100);
+      state.player.name=p.name||state.player.name;
+    }
+  }catch(e){}
+  newOrder(); ui();
+}
+async function savePlayer(){
+  clearTimeout(state.saveTimer);
+  state.saveTimer=setTimeout(async()=>{
+    try{
+      await fetch('/api/players',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        playerId:PLAYER_ID,id:PLAYER_ID,name:state.player.name,
+        balance:state.player.balance,totalRevenue:state.player.totalRevenue,
+        taxDue:Number(state.player.taxDue||0),rating:Number(state.player.rating||0),
+        level:state.player.level,xp:state.player.xp,maxXp:state.player.maxXp,
+        maxFleetSize:Number(state.player.maxFleetSize||1),
+        officeLevel:Number(state.player.officeLevel||1),
+        hasBoxUpgrade:!!state.player.hasBoxUpgrade,
+        riders:state.player.riders||[],
+        missionsProgress:state.player.missionsProgress||{}
+      })});
+    }catch(e){}
+  },250);
+}
+function newOrder(){
+  state.phase='offer'; state.accepted=false;
+  state.reward=190+Math.floor(Math.random()*160);
+  $('missionText').textContent='اضغط قبول الأوردر. بعد القبول روح لنقطة الاستلام ثم سلّم الطلب.';
+  $('accept').style.display='block';
+  ui();
+}
+$('accept').onclick=()=>{
+  state.accepted=true; state.phase='pickup'; state.distance=0;
+  $('accept').style.display='none';
+  $('missionText').textContent='الأوردر مقبول. اتحرك في الحارة الخضراء لحد نقطة الاستلام.';
+  toast('الأوردر اتقبل — دوس بنزين وابدأ!');
+};
+function toast(t){
+  $('toast').textContent=t;$('toast').style.opacity=1;
+  setTimeout(()=>$('toast').style.opacity=0,1600);
+}
+
+function spawnTraffic(){
+  const top=Math.random()<.5;
+  const imgs=['car_red','car_blue','car_yellow','car_white','car_black'];
+  const img=imgs[Math.floor(Math.random()*imgs.length)];
+  const el=document.createElement('img');
+  el.className='traffic '+(top?'top':'bottom');
+  el.src='motorcycle_assets/'+img+'.png';
+  el.draggable=false;
+  const speed=(top?24:20)+Math.random()*32;
+  const x=top?108+Math.random()*12:-15-Math.random()*20;
+  const dir=top?-1:1;
+  el.style.left=x+'%';
+  if(top) el.style.transform='translateX(-50%) scaleX(-1)';
+  state.traffic.push({el,x,dir,speed});
+  $('traffic').appendChild(el);
+}
+function updateTraffic(dt){
+  if(performance.now()>state.nextSpawn && state.traffic.length<7){
+    spawnTraffic(); state.nextSpawn=performance.now()+900+Math.random()*1800;
+  }
+  for(let i=state.traffic.length-1;i>=0;i--){
+    const t=state.traffic[i];
+    t.x += t.dir*t.speed*dt/1000;
+    t.el.style.left=t.x+'%';
+    if(t.x<-20||t.x>120){t.el.remove();state.traffic.splice(i,1);}
+  }
+}
+function setHold(btn,prop){
+  const on=e=>{e.preventDefault();state[prop]=true;btn.setPointerCapture?.(e.pointerId)};
+  const off=e=>{e.preventDefault();state[prop]=false};
+  btn.addEventListener('pointerdown',on);btn.addEventListener('pointerup',off);
+  btn.addEventListener('pointercancel',off);btn.addEventListener('pointerleave',off);
+}
+setHold($('gas'),'gas'); setHold($('brake'),'brake');
+function steer(dir){
+  state.playerX=Math.max(43,Math.min(57,state.playerX+dir*1.7));
+  $('player').style.left=state.playerX+'%';
+}
+['left','right'].forEach((id,i)=>{
+  $(id).addEventListener('pointerdown',e=>{e.preventDefault();steer(i?1:-1)});
+  $(id).addEventListener('pointerup',e=>e.preventDefault());
+});
+window.addEventListener('keydown',e=>{
+  if(['ArrowUp','w','W'].includes(e.key)) state.gas=true;
+  if(['ArrowDown','s','S',' '].includes(e.key)) state.brake=true;
+  if(['ArrowLeft','a','A'].includes(e.key)) steer(-1);
+  if(['ArrowRight','d','D'].includes(e.key)) steer(1);
+});
+window.addEventListener('keyup',e=>{
+  if(['ArrowUp','w','W'].includes(e.key)) state.gas=false;
+  if(['ArrowDown','s','S',' '].includes(e.key)) state.brake=false;
+});
+
+async function finishDelivery(){
+  // Refresh from server first so motorcycle rewards don't overwrite newer main-game money.
+  try{
+    const r=await fetch('/api/players/id/'+encodeURIComponent(PLAYER_ID));
+    if(r.ok){ const p=await r.json(); state.player={...state.player,...p}; }
+  }catch(e){}
+  const reward=state.reward;
+  state.player.balance=Number(state.player.balance||0)+reward;
+  state.player.totalRevenue=Number(state.player.totalRevenue||0)+reward;
+  state.player.xp=Number(state.player.xp||0)+10;
+  while(state.player.xp>=Number(state.player.maxXp||100)){
+    state.player.xp-=Number(state.player.maxXp||100);
+    state.player.level=Number(state.player.level||1)+1;
+    state.player.maxXp=Math.round(Number(state.player.maxXp||100)*1.25);
+  }
+  state.deliveries++;
+  localStorage.setItem('motorcycle_deliveries',state.deliveries);
+  if(state.player.missionsProgress){
+    for(const k of Object.keys(state.player.missionsProgress)){
+      const m=state.player.missionsProgress[k];
+      if(m && !m.claimed) m.progress=Number(m.progress||0)+1;
+    }
+  }
+  await savePlayer();
+  toast('تم التسليم +'+money(reward));
+  newOrder();
+}
+function update(dt){
+  const b=bikes[state.bike];
+  if(state.gas) state.speed=Math.min(b.max,state.speed+b.acc*dt/1000);
+  else state.speed=Math.max(0,state.speed-13*dt/1000);
+  if(state.brake) state.speed=Math.max(0,state.speed-85*dt/1000);
+  // forward movement is represented by road/traffic parallax
+  const scroll=state.speed*dt*0.018;
+  const bg=$('worldBg');
+  const current=(parseFloat(bg.dataset.x||'0')-scroll);
+  bg.dataset.x=current.toString();
+  bg.style.transform=`translateX(${(current%100)}px) scale(1.03)`;
+  $('motion').style.opacity=Math.min(.55,state.speed/b.max*.7);
+  $('player').style.transform=`translate(-50%,-50%) translateY(${Math.sin(performance.now()/75)*Math.min(3,state.speed/25)}px)`;
+  updateTraffic(dt);
+  if(state.accepted){
+    state.distance += state.speed*dt/1000;
+    if(state.phase==='pickup' && state.distance>55){
+      state.phase='delivery';state.distance=0;
+      $('missionText').textContent='وصلت نقطة الاستلام. كمّل قيادة لحد العميل.';
+      toast('📦 استلمت الطلب');
+    }else if(state.phase==='delivery' && state.distance>80){
+      state.accepted=false; state.phase='done'; finishDelivery();
+    }
+  }
+  ui();
+}
+function loop(now){
+  const dt=Math.min(50,now-state.last);state.last=now;update(dt);requestAnimationFrame(loop);
+}
+$('closeShop').onclick=()=>{$('shop').style.display='none'};
+document.querySelectorAll('[data-bike]').forEach(btn=>{
+  btn.onclick=async()=>{
+    const id=btn.dataset.bike, price={basic:0,sport:1500,turbo:4500,pro:9000}[id];
+    if(state.bike===id){toast('الموتوسيكل ده مملوك');return}
+    if(Number(state.player.balance||0)<price){toast('الرصيد الرئيسي مش كفاية');return}
+    state.player.balance-=price;state.bike=id;state.maxSpeed=bikes[id].max;
+    localStorage.setItem('motorcycle_owned_bike',id);
+    await savePlayer();ui();toast('تم شراء الموتوسيكل');
+  };
+});
+document.getElementById('shopOpen').onclick=()=>{document.getElementById('shop').style.display='flex'};
+document.addEventListener('contextmenu',e=>e.preventDefault());
+loadPlayer();requestAnimationFrame(loop);
+</script>
+</body>
+</html>
