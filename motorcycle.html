@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<title>قيادة الموتوسيكل - خريطة المدينة</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:Cairo,sans-serif;background:#020617;color:#f8fafc}
+body{user-select:none;overflow-x:hidden}
+canvas{display:block;width:100%;height:100%}
+input[type=range]{accent-color:#f59e0b}
+.glow{box-shadow:0 0 24px rgba(245,158,11,.24)}
+</style>
+</head>
+<body class="min-h-screen bg-slate-950">
+<header class="bg-slate-900/95 border-b border-slate-800 px-4 py-3 sticky top-0 z-50">
+  <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <div class="bg-gradient-to-tr from-amber-400 to-orange-600 p-2.5 rounded-xl shadow-lg">
+        <i class="fa-solid fa-motorcycle text-2xl text-slate-950"></i>
+      </div>
+      <div>
+        <h1 class="font-extrabold text-lg sm:text-xl">محاكي قيادة الموتوسيكل — خريطة المدينة</h1>
+        <p class="text-xs text-slate-400">الموتوسيكل الحقيقي + العجل الحقيقي + خريطة شوارع اللعبة + دوران مرتبط بالسرعة</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3 text-xs font-bold bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
+      <span class="flex items-center gap-1.5 text-emerald-400"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> قيادة مباشرة</span>
+      <span class="text-slate-600">|</span>
+      <span class="text-amber-400 font-mono">θ += (v / r) × dt</span>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto w-full p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+<section class="lg:col-span-8 flex flex-col gap-4">
+  <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+    <div class="relative w-full aspect-[16/9] bg-black overflow-hidden">
+      <canvas id="gameCanvas"></canvas>
+
+      <div class="absolute top-3 right-3 left-3 z-10 flex justify-between items-start pointer-events-none">
+        <div class="bg-slate-950/80 backdrop-blur-md border border-slate-700/60 rounded-xl px-3 py-2 flex items-center gap-4 pointer-events-auto">
+          <div class="text-center border-l border-slate-700 pl-3">
+            <div class="text-[9px] text-slate-400">السرعة</div>
+            <div><span id="hudSpeed" class="font-mono font-black text-xl text-amber-400">0</span><span class="text-[9px] text-slate-400"> كم/س</span></div>
+          </div>
+          <div class="text-center border-l border-slate-700 pl-3">
+            <div class="text-[9px] text-slate-400">RPM</div>
+            <span id="hudRpm" class="font-mono font-bold text-cyan-400">0</span>
+          </div>
+          <div class="text-center">
+            <div class="text-[9px] text-slate-400">زاوية العجلة</div>
+            <span id="hudAngle" class="font-mono font-bold text-emerald-400">0°</span>
+          </div>
+        </div>
+        <div class="bg-slate-950/75 border border-slate-700/60 rounded-xl px-3 py-2 text-[10px] text-slate-300">
+          <i class="fa-solid fa-road text-amber-400 ml-1"></i> طريق المدينة
+        </div>
+      </div>
+
+      <div id="loading" class="absolute inset-0 bg-slate-950 flex items-center justify-center z-20">
+        <div class="text-center">
+          <i class="fa-solid fa-spinner fa-spin text-3xl text-amber-400 mb-3"></i>
+          <div class="font-bold">جاري تحميل الخريطة والموتوسيكل...</div>
+          <div id="loadingText" class="text-xs text-slate-400 mt-1">0%</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-4 bg-slate-900 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-3 w-full sm:w-auto justify-center">
+        <button id="btnBrake" class="flex-1 sm:flex-initial bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white px-5 py-3 rounded-xl font-bold flex items-center justify-center gap-2">
+          <i class="fa-solid fa-hand-fist"></i><span>فرامل (S / ↓)</span>
+        </button>
+        <button id="btnGas" class="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 glow">
+          <i class="fa-solid fa-gauge-high"></i><span>بنزين (W / ↑)</span>
+        </button>
+      </div>
+      <div class="flex items-center gap-3 w-full sm:w-auto bg-slate-950 px-4 py-2 rounded-xl border border-slate-800">
+        <i class="fa-solid fa-sliders text-amber-500"></i>
+        <span class="text-xs font-semibold shrink-0">تحكم مباشر:</span>
+        <input id="manualSpeedSlider" type="range" min="-30" max="120" value="0" class="w-full sm:w-32">
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 flex items-start gap-3">
+    <i class="fa-solid fa-circle-info text-amber-400 mt-1"></i>
+    <p class="text-xs text-amber-100/90 leading-relaxed">
+      <strong class="text-amber-300">المنظور الجديد:</strong>
+      الخريطة أصبحت عالم القيادة نفسه، والموتوسيكل ثابت بصرياً في منطقة القيادة بينما المدينة والطريق يتحركان تحته.
+      العجلتان منفصلتان عن جسم الموتوسيكل وتدوران بالسرعة الفعلية.
+    </p>
+  </div>
+</section>
+
+<section class="lg:col-span-4 flex flex-col gap-4">
+  <div class="bg-slate-900 p-1.5 rounded-2xl border border-slate-800 flex gap-1">
+    <button data-tab="physics" class="tab-btn flex-1 py-2.5 rounded-xl font-bold text-xs bg-amber-500 text-slate-950 shadow-md">الفيزياء والتحكم</button>
+    <button data-tab="layers" class="tab-btn flex-1 py-2.5 rounded-xl font-bold text-xs text-slate-400 hover:bg-slate-800">تركيب الموتوسيكل</button>
+    <button data-tab="code" class="tab-btn flex-1 py-2.5 rounded-xl font-bold text-xs text-slate-400 hover:bg-slate-800">الأكواد</button>
+  </div>
+
+  <div class="bg-slate-900 rounded-2xl border border-slate-800 p-5 shadow-xl min-h-[420px]">
+    <div id="tab-physics" class="tab-content flex flex-col gap-5">
+      <h2 class="text-sm font-bold text-amber-400 border-b border-slate-800 pb-2"><i class="fa-solid fa-gear ml-1"></i> معايير حركة المركبة</h2>
+
+      <div class="space-y-2">
+        <div class="flex justify-between text-xs"><span>نصف قطر العجلة</span><span id="valWheelRadius" class="font-mono text-amber-400">30 px</span></div>
+        <input id="sliderWheelRadius" type="range" min="22" max="48" value="30" class="w-full">
+      </div>
+
+      <div class="space-y-2">
+        <div class="flex justify-between text-xs"><span>قوة المحرك</span><span id="valAccel" class="font-mono text-amber-400">150 px/s²</span></div>
+        <input id="sliderAccel" type="range" min="30" max="300" value="150" class="w-full">
+      </div>
+
+      <div class="space-y-2">
+        <div class="flex justify-between text-xs"><span>السرعة القصوى</span><span id="valMaxSpeed" class="font-mono text-amber-400">80 km/h</span></div>
+        <input id="sliderMaxSpeed" type="range" min="30" max="180" value="80" class="w-full">
+      </div>
+
+      <div class="space-y-2">
+        <div class="flex justify-between text-xs"><span>حجم الموتوسيكل</span><span id="valBikeScale" class="font-mono text-cyan-400">100%</span></div>
+        <input id="sliderBikeScale" type="range" min="65" max="135" value="100" class="w-full">
+      </div>
+
+      <div class="space-y-2">
+        <div class="flex justify-between text-xs"><span>ارتفاع الموتوسيكل على الطريق</span><span id="valBikeY" class="font-mono text-cyan-400">0</span></div>
+        <input id="sliderBikeY" type="range" min="-70" max="70" value="0" class="w-full">
+      </div>
+
+      <button id="btnResetPhysics" class="mt-auto w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl">
+        <i class="fa-solid fa-rotate-left ml-1"></i> إعادة الضبط
+      </button>
+    </div>
+
+    <div id="tab-layers" class="tab-content hidden flex flex-col gap-3">
+      <h2 class="text-sm font-bold text-indigo-400 border-b border-slate-800 pb-2">تركيب الموتوسيكل الجديد</h2>
+      <div class="p-3 bg-slate-950 rounded-xl border border-slate-800">
+        <b class="text-xs">1 — العجلة الخلفية</b>
+        <p class="text-[10px] text-slate-400 mt-1">Sprite مستقل يدور حول مركزه.</p>
+      </div>
+      <div class="p-3 bg-slate-950 rounded-xl border border-slate-800">
+        <b class="text-xs">2 — العجلة الأمامية</b>
+        <p class="text-[10px] text-slate-400 mt-1">نفس زاوية الدوران المرتبطة بسرعة الموتوسيكل.</p>
+      </div>
+      <div class="p-3 bg-slate-950 rounded-xl border border-slate-800">
+        <b class="text-xs">3 — جسم الموتوسيكل والسائق</b>
+        <p class="text-[10px] text-slate-400 mt-1">الصورة التي أرسلتها، فوق العجلتين.</p>
+      </div>
+      <div class="p-3 bg-emerald-950/30 rounded-xl border border-emerald-800/40 text-[11px] text-emerald-200 mt-auto">
+        <i class="fa-solid fa-check ml-1"></i> الخلفية البيضاء للصور تم تحويلها إلى شفافية، لذلك لن يظهر مربع أبيض حول الموتوسيكل أو العجل.
+      </div>
+    </div>
+
+    <div id="tab-code" class="tab-content hidden flex flex-col gap-3">
+      <h2 class="text-sm font-bold text-emerald-400 border-b border-slate-800 pb-2">منطق الحركة المستخدم</h2>
+      <pre class="bg-slate-950 rounded-xl border border-slate-800 p-3 text-[10px] leading-relaxed text-slate-300 overflow-auto" dir="ltr"><code>speed += accel * dt;
+worldX += speed * dt * 1.5;
+
+angularVelocity = speed / wheelRadius;
+wheelAngle += angularVelocity * dt;
+
+drawMap(worldX);
+drawWheel(rearWheel, wheelAngle);
+drawWheel(frontWheel, wheelAngle);
+drawBikeBody();</code></pre>
+      <p class="text-[11px] text-slate-400 leading-relaxed">
+        أهم نقطة هنا أن جسم الموتوسيكل لا يعاد رسمه كرسمة بديلة؛ يتم استخدام الـSprite الذي أرسلته، والعجلتان هما الـSprite الحقيقي من صورة العجل.
+      </p>
+    </div>
+  </div>
+</section>
+</main>
+
+<div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 px-4 py-2 rounded-xl font-bold text-xs shadow-2xl opacity-0 pointer-events-none transition z-50"></div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const assets = {
+  map: new Image(),
+  bike: new Image(),
+  wheel: new Image()
+};
+assets.map.src = 'assets/city_map.jpg';
+assets.bike.src = 'assets/motorcycle.png';
+assets.wheel.src = 'assets/wheel.png';
+
+let loaded = 0;
+function assetLoaded(){
+  loaded++;
+  document.getElementById('loadingText').textContent = Math.round(loaded/3*100) + '%';
+  if(loaded >= 3) document.getElementById('loading').style.display='none';
+}
+Object.values(assets).forEach(img => {
+  img.onload = assetLoaded;
+  img.onerror = () => {
+    document.getElementById('loadingText').textContent = 'خطأ في تحميل أحد الملفات';
+  };
+});
+
+const state = {
+  speed:0,
+  maxSpeed:256,
+  accel:150,
+  friction:55,
+  brakePower:360,
+  wheelRadius:30,
+  wheelAngle:0,
+  worldX:0,
+  inputGas:false,
+  inputBrake:false,
+  manualOverride:false,
+  bikeScale:1,
+  bikeY:0
+};
+
+const $ = id => document.getElementById(id);
+const hudSpeed=$('hudSpeed'), hudRpm=$('hudRpm'), hudAngle=$('hudAngle');
+const sliderWheelRadius=$('sliderWheelRadius');
+const sliderAccel=$('sliderAccel');
+const sliderMaxSpeed=$('sliderMaxSpeed');
+const sliderBikeScale=$('sliderBikeScale');
+const sliderBikeY=$('sliderBikeY');
+const manualSpeedSlider=$('manualSpeedSlider');
+
+function resizeCanvas(){
+  const r=canvas.getBoundingClientRect();
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  canvas.width=Math.max(1,Math.round(r.width*dpr));
+  canvas.height=Math.max(1,Math.round(r.height*dpr));
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize',resizeCanvas);
+
+function drawCoverImage(img, x, y, w, h, sx=0, sy=0, sw=img.width, sh=img.height){
+  if(!img.complete || !img.naturalWidth) return;
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
+
+function drawCityMap(width,height){
+  ctx.fillStyle='#111827';
+  ctx.fillRect(0,0,width,height);
+
+  const mapAspect=assets.map.naturalWidth/assets.map.naturalHeight;
+  const drawH=height*1.18;
+  const drawW=drawH*mapAspect;
+  const y=(height-drawH)/2 - height*0.03;
+  const offset=-(state.worldX % drawW);
+
+  for(let k=-1;k<=2;k++){
+    drawCoverImage(assets.map, offset+k*drawW, y, drawW, drawH);
+  }
+
+  const topGrad=ctx.createLinearGradient(0,0,0,height);
+  topGrad.addColorStop(0,'rgba(2,6,23,.16)');
+  topGrad.addColorStop(.58,'rgba(2,6,23,0)');
+  topGrad.addColorStop(1,'rgba(2,6,23,.22)');
+  ctx.fillStyle=topGrad;
+  ctx.fillRect(0,0,width,height);
+
+  const vg=ctx.createRadialGradient(width/2,height*.48,height*.1,width/2,height*.48,height*.78);
+  vg.addColorStop(.65,'rgba(0,0,0,0)');
+  vg.addColorStop(1,'rgba(0,0,0,.28)');
+  ctx.fillStyle=vg;
+  ctx.fillRect(0,0,width,height);
+}
+
+function bikeGeometry(width,height){
+  const baseW=Math.min(width*0.48,430);
+  const scale=state.bikeScale;
+  const bw=baseW*scale;
+  const bh=bw*(assets.bike.naturalHeight/assets.bike.naturalWidth);
+  const x=width*.50 - bw*.50;
+  const wheelY=height*.67 + state.bikeY;
+  const rearLocalX=126/assets.bike.naturalWidth;
+  const frontLocalX=458/assets.bike.naturalWidth;
+  const localWheelY=385/assets.bike.naturalHeight;
+  return {
+    x,y:wheelY-localWheelY*bh,bw,bh,
+    rearX:x+rearLocalX*bw,
+    frontX:x+frontLocalX*bw,
+    wheelY
+  };
+}
+
+function drawWheel(cx,cy,r,angle){
+  if(!assets.wheel.complete) return;
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.rotate(angle);
+  ctx.imageSmoothingEnabled=true;
+  ctx.drawImage(assets.wheel,-r,-r,r*2,r*2);
+  ctx.restore();
+}
+
+function drawMotorcycle(width,height){
+  const g=bikeGeometry(width,height);
+  const wheelScale=g.bw/assets.bike.naturalWidth;
+  const r=state.wheelRadius*wheelScale*1.55;
+
+  ctx.save();
+  ctx.globalAlpha=.28;
+  ctx.filter='blur(7px)';
+  ctx.fillStyle='#000';
+  ctx.beginPath();
+  ctx.ellipse((g.rearX+g.frontX)/2,g.wheelY+r*.72,g.bw*.34,r*.27,0,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+
+  drawWheel(g.rearX,g.wheelY,r,state.wheelAngle);
+  drawWheel(g.frontX,g.wheelY,r,state.wheelAngle);
+
+  if(assets.bike.complete){
+    ctx.save();
+    ctx.imageSmoothingEnabled=true;
+    ctx.drawImage(assets.bike,g.x,g.y,g.bw,g.bh);
+    ctx.restore();
+  }
+}
+
+function updatePhysics(dt){
+  if(!state.manualOverride){
+    if(state.inputGas) state.speed += state.accel*dt;
+    else if(state.inputBrake) state.speed -= state.brakePower*dt;
+    else {
+      if(state.speed>0) state.speed=Math.max(0,state.speed-state.friction*dt);
+      if(state.speed<0) state.speed=Math.min(0,state.speed+state.friction*dt);
+    }
+    state.speed=Math.max(-70,Math.min(state.maxSpeed,state.speed));
+  }else{
+    state.speed=parseFloat(manualSpeedSlider.value)*2.6;
+  }
+
+  state.wheelAngle += (state.speed/Math.max(1,state.wheelRadius))*dt;
+  state.worldX += state.speed*dt*1.65;
+}
+
+function frame(t){
+  const dt=Math.min((t-lastTime)/1000,.08);
+  lastTime=t;
+  updatePhysics(dt);
+
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  const width=canvas.width/dpr, height=canvas.height/dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,width,height);
+
+  drawCityMap(width,height);
+  drawMotorcycle(width,height);
+
+  const kmh=Math.round(Math.abs(state.speed)*.34);
+  const rpm=Math.round(Math.abs(state.speed/Math.max(1,state.wheelRadius))*60/(2*Math.PI));
+  const deg=Math.round(((state.wheelAngle%(Math.PI*2))*180/Math.PI+360)%360);
+  hudSpeed.textContent=kmh;
+  hudRpm.textContent=rpm;
+  hudAngle.textContent=deg+'°';
+
+  requestAnimationFrame(frame);
+}
+let lastTime=performance.now();
+
+function bindPedal(btn,prop){
+  const start=e=>{e.preventDefault();state[prop]=true;state.manualOverride=false};
+  const end=e=>{e.preventDefault();state[prop]=false};
+  btn.addEventListener('pointerdown',start);
+  btn.addEventListener('pointerup',end);
+  btn.addEventListener('pointercancel',end);
+  btn.addEventListener('pointerleave',end);
+}
+bindPedal($('btnGas'),'inputGas');
+bindPedal($('btnBrake'),'inputBrake');
+
+window.addEventListener('keydown',e=>{
+  if(['ArrowUp','ArrowDown','w','W','s','S'].includes(e.key)) e.preventDefault();
+  if(e.key==='ArrowUp'||e.key==='w'||e.key==='W'){state.inputGas=true;state.manualOverride=false}
+  if(e.key==='ArrowDown'||e.key==='s'||e.key==='S'){state.inputBrake=true;state.manualOverride=false}
+});
+window.addEventListener('keyup',e=>{
+  if(e.key==='ArrowUp'||e.key==='w'||e.key==='W') state.inputGas=false;
+  if(e.key==='ArrowDown'||e.key==='s'||e.key==='S') state.inputBrake=false;
+});
+
+sliderWheelRadius.addEventListener('input',e=>{
+  state.wheelRadius=+e.target.value;
+  $('valWheelRadius').textContent=state.wheelRadius+' px';
+});
+sliderAccel.addEventListener('input',e=>{
+  state.accel=+e.target.value;
+  $('valAccel').textContent=state.accel+' px/s²';
+});
+sliderMaxSpeed.addEventListener('input',e=>{
+  const v=+e.target.value;
+  state.maxSpeed=v*3.2;
+  $('valMaxSpeed').textContent=v+' km/h';
+});
+sliderBikeScale.addEventListener('input',e=>{
+  state.bikeScale=+e.target.value/100;
+  $('valBikeScale').textContent=e.target.value+'%';
+});
+sliderBikeY.addEventListener('input',e=>{
+  state.bikeY=+e.target.value;
+  $('valBikeY').textContent=e.target.value;
+});
+manualSpeedSlider.addEventListener('input',()=>state.manualOverride=true);
+
+$('btnResetPhysics').addEventListener('click',()=>{
+  sliderWheelRadius.value=30; state.wheelRadius=30; $('valWheelRadius').textContent='30 px';
+  sliderAccel.value=150; state.accel=150; $('valAccel').textContent='150 px/s²';
+  sliderMaxSpeed.value=80; state.maxSpeed=256; $('valMaxSpeed').textContent='80 km/h';
+  sliderBikeScale.value=100; state.bikeScale=1; $('valBikeScale').textContent='100%';
+  sliderBikeY.value=0; state.bikeY=0; $('valBikeY').textContent='0';
+  manualSpeedSlider.value=0; state.manualOverride=false; state.speed=0;
+  toast('تمت إعادة ضبط الحركة');
+});
+
+function toast(msg){
+  const t=$('toast');
+  t.textContent=msg;
+  t.classList.remove('opacity-0','pointer-events-none');
+  setTimeout(()=>t.classList.add('opacity-0','pointer-events-none'),1800);
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const target=btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b=>{
+      b.classList.remove('bg-amber-500','text-slate-950','shadow-md');
+      b.classList.add('text-slate-400');
+    });
+    btn.classList.add('bg-amber-500','text-slate-950','shadow-md');
+    btn.classList.remove('text-slate-400');
+    document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('hidden',c.id!=='tab-'+target));
+  });
+});
+
+resizeCanvas();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
